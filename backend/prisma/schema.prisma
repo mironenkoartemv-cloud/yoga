@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TRAINER
+  ADMIN
+}
+
+enum Direction {
+  YOGA
+  PILATES
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum TrainingStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum RoomStatus {
+  WAITING
+  LIVE
+  ENDED
+}
+
+model User {
+  id          String    @id @default(uuid())
+  phone       String?   @unique
+  email       String?   @unique
+  password    String?
+  name        String
+  avatarUrl   String?
+  role        Role      @default(STUDENT)
+  isBlocked   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  bookings        Booking[]
+  payments        Payment[]
+  trainingsAsTrainer Training[] @relation("TrainerTrainings")
+  notifications   Notification[]
+  roomParticipants RoomParticipant[]
+
+  @@map("users")
+}
+
+model Training {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  trainerId   String
+  trainer     User           @relation("TrainerTrainings", fields: [trainerId], references: [id])
+  direction   Direction
+  level       Level
+  startAt     DateTime
+  durationMin Int
+  maxSlots    Int
+  price       Int            // в копейках
+  status      TrainingStatus @default(SCHEDULED)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  bookings    Booking[]
+  room        Room?
+  moderationRequests ModerationRequest[]
+
+  @@map("trainings")
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  trainingId  String
+  training    Training      @relation(fields: [trainingId], references: [id])
+  status      BookingStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  payment     Payment?
+
+  @@unique([userId, trainingId])
+  @@map("bookings")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  bookingId   String        @unique
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+  amount      Int           // в копейках
+  status      PaymentStatus @default(PENDING)
+  provider    String        @default("stub") // yukassa, sbp, stub
+  externalId  String?       // ID во внешней системе
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Room {
+  id          String     @id @default(uuid())
+  trainingId  String     @unique
+  training    Training   @relation(fields: [trainingId], references: [id])
+  status      RoomStatus @default(WAITING)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime   @default(now())
+
+  participants RoomParticipant[]
+
+  @@map("rooms")
+}
+
+model RoomParticipant {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  socketId  String?
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  @@unique([roomId, userId])
+  @@map("room_participants")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // REMINDER_1H, REMINDER_10M, TRAINING_START, SCHEDULE_CHANGE
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  sentAt    DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model ModerationRequest {
+  id          String   @id @default(uuid())
+  trainingId  String
+  training    Training @relation(fields: [trainingId], references: [id])
+  trainerId   String
+  field       String   // 'description'
+  newValue    String
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewNote  String?
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+
+  @@map("moderation_requests")
+}
