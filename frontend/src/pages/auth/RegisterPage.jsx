@@ -6,12 +6,13 @@ import { Input, Alert, Spinner } from '../../components/ui'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const { registerByEmail, loading, error, clearError } = useAuthStore()
+  const { sendOtp, verifyOtp, loading, error, clearError } = useAuthStore()
 
-  const [roleType, setRoleType] = useState('student') // 'student' | 'trainer'
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', trainerBio: '' })
+  const [step, setStep] = useState(1) // 1 = ввод данных, 2 = ввод кода
+  const [roleType, setRoleType] = useState('student')
+  const [form, setForm] = useState({ name: '', phone: '', trainerBio: '' })
+  const [code, setCode] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const [trainerPending, setTrainerPending] = useState(false)
 
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -19,59 +20,74 @@ export default function RegisterPage() {
     clearError()
   }
 
-  const validate = () => {
+  const validateStep1 = () => {
     const errs = {}
-    if (!form.name.trim())          errs.name     = 'Введите имя'
-    if (!form.email.includes('@'))  errs.email    = 'Неверный email'
-    if (form.password.length < 6)   errs.password = 'Минимум 6 символов'
-    if (form.password !== form.confirm) errs.confirm = 'Пароли не совпадают'
+    if (!form.name.trim())  errs.name  = 'Введите имя'
+    if (!form.phone.trim()) errs.phone = 'Введите номер телефона'
+    else if (!/^\+7\d{10}$/.test(form.phone.replace(/\s/g, '')))
+      errs.phone = 'Формат: +79001234567'
     return errs
   }
 
-  const handleSubmit = async (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault()
-    const errs = validate()
+    const errs = validateStep1()
     if (Object.keys(errs).length) return setFieldErrors(errs)
-
     try {
-      const result = await registerByEmail(
-        form.email,
-        form.password,
-        form.name,
-        roleType === 'trainer' ? 'TRAINER' : 'STUDENT',
-        roleType === 'trainer' ? form.trainerBio : undefined,
-      )
-      if (result?.trainerRequestPending) {
-        setTrainerPending(true)
-      } else {
-        navigate('/catalog')
-      }
+      await sendOtp(form.phone)
+      setStep(2)
     } catch {}
   }
 
-  // Показываем экран ожидания если заявка тренера отправлена
-  if (trainerPending) {
+  const handleVerify = async (e) => {
+    e.preventDefault()
+    if (!code.trim()) return setFieldErrors({ code: 'Введите код' })
+    try {
+      await verifyOtp(form.phone, code, form.name)
+      navigate('/catalog')
+    } catch {}
+  }
+
+  // Шаг 2 — ввод кода
+  if (step === 2) {
     return (
-      <AuthLayout title="Заявка отправлена" subtitle="Ожидайте проверки">
-        <div className="text-center py-6">
-          <div className="text-5xl mb-4">🎉</div>
-          <p className="font-body text-stone-600 mb-2">
-            Ваша заявка на роль тренера отправлена на модерацию.
-          </p>
-          <p className="font-body text-sm text-stone-400 mb-6">
-            Мы рассмотрим её в течение 24 часов и уведомим вас по email.
-          </p>
-          <p className="font-body text-sm text-stone-500 mb-4">
-            Пока можете войти как ученик и изучить расписание.
-          </p>
-          <Link to="/catalog" className="btn-primary inline-flex">
-            Перейти в каталог
-          </Link>
-        </div>
+      <AuthLayout
+        title="Введите код"
+        subtitle={`Мы отправили SMS на ${form.phone}`}
+        footer={
+          <button
+            type="button"
+            className="text-sage-600 hover:underline font-medium"
+            onClick={() => { setStep(1); clearError() }}
+          >
+            ← Изменить номер
+          </button>
+        }
+      >
+        {error && <Alert type="error" className="mb-4">{error}</Alert>}
+
+        <form onSubmit={handleVerify} className="flex flex-col gap-4">
+          <Input
+            label="Код из SMS"
+            type="text"
+            inputMode="numeric"
+            placeholder="123456"
+            value={code}
+            onChange={(e) => { setCode(e.target.value); clearError() }}
+            error={fieldErrors.code}
+            autoFocus
+            maxLength={6}
+          />
+
+          <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
+            {loading ? <Spinner size="sm" className="text-white" /> : 'Подтвердить'}
+          </button>
+        </form>
       </AuthLayout>
     )
   }
 
+  // Шаг 1 — ввод данных
   return (
     <AuthLayout
       title="Создать аккаунт"
@@ -87,7 +103,7 @@ export default function RegisterPage() {
     >
       {error && <Alert type="error" className="mb-4">{error}</Alert>}
 
-      {/* Role switcher */}
+      {/* Переключатель роли */}
       <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-5">
         <button type="button"
           onClick={() => setRoleType('student')}
@@ -105,20 +121,19 @@ export default function RegisterPage() {
               ? 'bg-white text-stone-800 shadow-sm'
               : 'text-stone-500 hover:text-stone-700'
           }`}>
-          🏋️ Я тренер
+          🏋️‍♀️ Я тренер
         </button>
       </div>
 
-      {/* Trainer notice */}
       {roleType === 'trainer' && (
         <div className="bg-sage-50 border border-sage-200 rounded-2xl px-4 py-3 mb-4">
           <p className="font-body text-xs text-sage-700">
-            Заявка тренера проходит модерацию в течение 24 часов. После одобрения вы сможете создавать тренировки.
+            Заявка тренера проходит модерацию в течение 24 часов.
           </p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
         <Input
           label="Имя"
           type="text"
@@ -129,31 +144,14 @@ export default function RegisterPage() {
           autoFocus
         />
         <Input
-          label="Email"
-          type="email"
-          placeholder="you@example.com"
-          value={form.email}
-          onChange={set('email')}
-          error={fieldErrors.email}
-        />
-        <Input
-          label="Пароль"
-          type="password"
-          placeholder="Минимум 6 символов"
-          value={form.password}
-          onChange={set('password')}
-          error={fieldErrors.password}
-        />
-        <Input
-          label="Повторите пароль"
-          type="password"
-          placeholder="••••••••"
-          value={form.confirm}
-          onChange={set('confirm')}
-          error={fieldErrors.confirm}
+          label="Телефон"
+          type="tel"
+          placeholder="+79001234567"
+          value={form.phone}
+          onChange={set('phone')}
+          error={fieldErrors.phone}
         />
 
-        {/* Trainer bio */}
         {roleType === 'trainer' && (
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-body font-medium text-stone-600 uppercase tracking-wider">
@@ -169,17 +167,8 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <p className="font-body text-xs text-stone-400 leading-relaxed">
-          Регистрируясь, вы соглашаетесь с{' '}
-          <span className="text-sage-600 cursor-pointer hover:underline">условиями использования</span>
-          {' '}и{' '}
-          <span className="text-sage-600 cursor-pointer hover:underline">политикой конфиденциальности</span>.
-        </p>
-
         <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
-          {loading ? <Spinner size="sm" className="text-white" /> :
-            roleType === 'trainer' ? 'Подать заявку' : 'Зарегистрироваться'
-          }
+          {loading ? <Spinner size="sm" className="text-white" /> : 'Получить код'}
         </button>
       </form>
     </AuthLayout>
