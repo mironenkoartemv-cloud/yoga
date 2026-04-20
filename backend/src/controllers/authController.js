@@ -72,28 +72,39 @@ const loginByEmail = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/auth/phone/send-otp  — отправить SMS (заглушка)
+// POST /api/auth/phone/send-otp  — отправить SMS (с проверкой существования)
 const sendPhoneOtp = async (req, res, next) => {
   try {
-    const { phone } = req.body;
+    const { phone, purpose } = req.body; // purpose: 'login' | 'register'
     if (!phone) return res.status(400).json({ error: 'Телефон обязателен' });
+
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
+
+    if (purpose === 'login' && !existingUser) {
+      return res.status(404).json({ error: 'Пользователь с таким номером не найден. Зарегистрируйтесь' });
+    }
+    if (purpose === 'register' && existingUser) {
+      return res.status(409).json({ error: 'Пользователь с таким номером уже существует. Войдите' });
+    }
+    if (existingUser?.isBlocked) {
+      return res.status(403).json({ error: 'Аккаунт заблокирован' });
+    }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 минут
     otpStore.set(phone, { code, expiresAt });
 
-    await smsService.sendOtp(phone, code); // заглушка
+    await smsService.sendOtp(phone, code);
 
-    // В dev-режиме возвращаем код в ответе для тестирования
     const devPayload = process.env.NODE_ENV !== 'production' ? { dev_code: code } : {};
     res.json({ message: 'SMS отправлено', ...devPayload });
   } catch (err) { next(err); }
 };
 
-// POST /api/auth/phone/verify-otp  — проверить код
+// POST /api/auth/phone/verify-otp  — проверить код и создать/войти
 const verifyPhoneOtp = async (req, res, next) => {
   try {
-    const { phone, code, name } = req.body;
+    const { phone, code, name, password, role, trainerBio } = req.body;
     if (!phone || !code) return res.status(400).json({ error: 'Телефон и код обязательны' });
 
     const entry = otpStore.get(phone);
@@ -107,14 +118,34 @@ const verifyPhoneOtp = async (req, res, next) => {
     otpStore.delete(phone);
 
     let user = await prisma.user.findUnique({ where: { phone } });
+    const isTrainerRequest = role === 'TRAINER';
+
     if (!user) {
+      // Регистрация — сохраняем пароль если передан
+      const hashed = password ? await bcrypt.hash(password, 10) : null;
       user = await prisma.user.create({
-        data: { phone, name: name || 'Пользователь', role: 'STUDENT' },
+        data: {
+          phone,
+          name: name || 'Пользователь',
+          password: hashed,
+          role: 'STUDENT', // TRAINER-запрос обрабатывается ниже
+        },
       });
+
+      if (isTrainerRequest) {
+        await prisma.$queryRawUnsafe(
+          'UPDATE users SET "trainerRequest" = true, "trainerBio" = $1 WHERE id = \'' + user.id + '\'',
+          trainerBio || null
+        );
+      }
     }
 
     const token = generateToken(user.id);
-    res.json({ token, user: sanitize(user) });
+    res.json({
+      token,
+      user: sanitize(user),
+      trainerRequestPending: isTrainerRequest && !user.password, // новый тренер
+    });
   } catch (err) { next(err); }
 };
 
