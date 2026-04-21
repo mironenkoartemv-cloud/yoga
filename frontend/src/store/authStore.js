@@ -7,7 +7,6 @@ export const useAuthStore = create((set, get) => ({
   loading: false,
   error:   null,
 
-  // Инициализация — проверить токен при старте приложения
   init: async () => {
     const token = sessionStorage.getItem('token')
     if (!token) return
@@ -21,7 +20,6 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Регистрация по email
   registerByEmail: async (email, password, name, role = 'STUDENT', trainerBio) => {
     set({ loading: true, error: null })
     try {
@@ -36,7 +34,6 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Вход по email
   loginByEmail: async (email, password) => {
     set({ loading: true, error: null })
     try {
@@ -51,11 +48,11 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Отправить OTP
-  sendOtp: async (phone) => {
+  // Отправить OTP (purpose: 'login' | 'register')
+  sendOtp: async (phone, purpose) => {
     set({ loading: true, error: null })
     try {
-      const { data } = await authApi.sendOtp(phone)
+      const { data } = await authApi.sendOtp(phone, purpose)
       set({ loading: false })
       return data
     } catch (err) {
@@ -65,16 +62,31 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // Подтвердить OTP
-  verifyOtp: async (phone, code, name) => {
+  // Подтвердить OTP (при регистрации передаём password, role, trainerBio)
+  verifyOtp: async (phone, code, name, password, role, trainerBio) => {
     set({ loading: true, error: null })
     try {
-      const { data } = await authApi.verifyOtp(phone, code, name)
+      const { data } = await authApi.verifyOtp(phone, code, name, password, role, trainerBio)
       sessionStorage.setItem('token', data.token)
       set({ user: data.user, token: data.token, loading: false })
       return data
     } catch (err) {
       const msg = err.response?.data?.error || 'Неверный код'
+      set({ error: msg, loading: false })
+      throw new Error(msg)
+    }
+  },
+
+  // Вход по телефону + паролю
+  loginByPhone: async (phone, password) => {
+    set({ loading: true, error: null })
+    try {
+      const { data } = await authApi.loginByPhone(phone, password)
+      sessionStorage.setItem('token', data.token)
+      set({ user: data.user, token: data.token, loading: false })
+      return data
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Неверный телефон или пароль'
       set({ error: msg, loading: false })
       throw new Error(msg)
     }

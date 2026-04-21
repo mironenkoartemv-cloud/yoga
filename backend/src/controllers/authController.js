@@ -26,7 +26,6 @@ const registerByEmail = async (req, res, next) => {
     const hashed = await bcrypt.hash(password, 10);
     const isTrainerRequest = role === 'TRAINER';
 
-    // Создаём пользователя без новых полей
     const user = await prisma.user.create({
       data: {
         email,
@@ -36,7 +35,6 @@ const registerByEmail = async (req, res, next) => {
       },
     });
 
-    // Если заявка тренера — обновляем через raw SQL
     if (isTrainerRequest) {
       await prisma.$queryRawUnsafe(
         'UPDATE users SET "trainerRequest" = true, "trainerBio" = $1 WHERE id = \'' + user.id + '\'',
@@ -119,6 +117,7 @@ const verifyPhoneOtp = async (req, res, next) => {
 
     let user = await prisma.user.findUnique({ where: { phone } });
     const isTrainerRequest = role === 'TRAINER';
+    const isNewUser = !user;
 
     if (!user) {
       // Регистрация — сохраняем пароль если передан
@@ -144,23 +143,39 @@ const verifyPhoneOtp = async (req, res, next) => {
     res.json({
       token,
       user: sanitize(user),
-      trainerRequestPending: isTrainerRequest && !user.password, // новый тренер
+      trainerRequestPending: isNewUser && isTrainerRequest,
     });
+  } catch (err) { next(err); }
+};
+
+// POST /api/auth/login-by-phone  — вход по телефону + пароль
+const loginByPhonePassword = async (req, res, next) => {
+  try {
+    const { phone, password } = req.body;
+    if (!phone || !password) return res.status(400).json({ error: 'Телефон и пароль обязательны' });
+
+    const user = await prisma.user.findUnique({ where: { phone } });
+    if (!user || !user.password) return res.status(401).json({ error: 'Неверные данные' });
+    if (user.isBlocked) return res.status(403).json({ error: 'Аккаунт заблокирован' });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Неверные данные' });
+
+    const token = generateToken(user.id);
+    res.json({ token, user: sanitize(user) });
   } catch (err) { next(err); }
 };
 
 // POST /api/auth/telegram  — Telegram Login (заглушка)
 const telegramLogin = async (req, res, next) => {
   try {
-    // В реальности — проверка hash из Telegram Login Widget
-    // https://core.telegram.org/widgets/login
     const { id, first_name, last_name, username, photo_url, hash } = req.body;
 
     // STUB: пропускаем верификацию hash
     // TODO: проверить hash через HMAC-SHA256 с BOT_TOKEN
 
     let user = await prisma.user.findFirst({
-      where: { email: `tg_${id}@stub.local` }, // временный идентификатор
+      where: { email: `tg_${id}@stub.local` },
     });
 
     if (!user) {
@@ -196,4 +211,5 @@ module.exports = {
   verifyPhoneOtp,
   telegramLogin,
   getMe,
+  loginByPhonePassword,
 };

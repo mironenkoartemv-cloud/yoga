@@ -6,24 +6,47 @@ import { Input, Alert, Spinner } from '../../components/ui'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { sendOtp, verifyOtp, loading, error, clearError } = useAuthStore()
+  const { sendOtp, verifyOtp, loginByPhone, loading, error, clearError } = useAuthStore()
 
-  const [step, setStep] = useState(1) // 1 = ввод телефона, 2 = ввод кода
+  const [mode, setMode] = useState('password') // 'password' | 'sms'
+  const [step, setStep] = useState(1) // для SMS: 1 = телефон, 2 = код
   const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
 
+  const validatePhone = () => {
+    if (!phone.trim()) return 'Введите номер телефона'
+    if (!/^\+7\d{10}$/.test(phone.replace(/\s/g, ''))) return 'Формат: +79001234567'
+    return null
+  }
+
+  // Вход по паролю
+  const handleLoginByPassword = async (e) => {
+    e.preventDefault()
+    const phoneErr = validatePhone()
+    const errs = {}
+    if (phoneErr) errs.phone = phoneErr
+    if (!password) errs.password = 'Введите пароль'
+    if (Object.keys(errs).length) return setFieldErrors(errs)
+    try {
+      await loginByPhone(phone, password)
+      navigate('/catalog')
+    } catch {}
+  }
+
+  // Отправить SMS для входа
   const handleSendOtp = async (e) => {
     e.preventDefault()
-    if (!/^\+7\d{10}$/.test(phone.replace(/\s/g, ''))) {
-      return setFieldErrors({ phone: 'Формат: +79001234567' })
-    }
+    const phoneErr = validatePhone()
+    if (phoneErr) return setFieldErrors({ phone: phoneErr })
     try {
-      await sendOtp(phone)
+      await sendOtp(phone, 'login')
       setStep(2)
     } catch {}
   }
 
+  // Подтвердить код
   const handleVerify = async (e) => {
     e.preventDefault()
     if (!code.trim()) return setFieldErrors({ code: 'Введите код' })
@@ -33,8 +56,18 @@ export default function LoginPage() {
     } catch {}
   }
 
-  // Шаг 2 — ввод кода
-  if (step === 2) {
+  // Переключение режима сбрасывает всё
+  const switchMode = (newMode) => {
+    setMode(newMode)
+    setStep(1)
+    setCode('')
+    setPassword('')
+    setFieldErrors({})
+    clearError()
+  }
+
+  // SMS режим, шаг 2 — ввод кода
+  if (mode === 'sms' && step === 2) {
     return (
       <AuthLayout
         title="Введите код"
@@ -63,7 +96,6 @@ export default function LoginPage() {
             autoFocus
             maxLength={6}
           />
-
           <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
             {loading ? <Spinner size="sm" className="text-white" /> : 'Войти'}
           </button>
@@ -72,11 +104,10 @@ export default function LoginPage() {
     )
   }
 
-  // Шаг 1 — ввод телефона
   return (
     <AuthLayout
       title="Войти"
-      subtitle="Введите номер телефона — отправим код"
+      subtitle="Выберите способ входа"
       footer={
         <>
           Нет аккаунта?{' '}
@@ -88,21 +119,63 @@ export default function LoginPage() {
     >
       {error && <Alert type="error" className="mb-4">{error}</Alert>}
 
-      <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
-        <Input
-          label="Телефон"
-          type="tel"
-          placeholder="+79001234567"
-          value={phone}
-          onChange={(e) => { setPhone(e.target.value); clearError(); setFieldErrors({}) }}
-          error={fieldErrors.phone}
-          autoFocus
-        />
-
-        <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
-          {loading ? <Spinner size="sm" className="text-white" /> : 'Получить код'}
+      {/* Переключатель режима */}
+      <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-5">
+        <button type="button"
+          onClick={() => switchMode('password')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+            mode === 'password' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          }`}>
+          🔒 По паролю
         </button>
-      </form>
+        <button type="button"
+          onClick={() => switchMode('sms')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+            mode === 'sms' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          }`}>
+          💬 По SMS
+        </button>
+      </div>
+
+      {mode === 'password' ? (
+        <form onSubmit={handleLoginByPassword} className="flex flex-col gap-4">
+          <Input
+            label="Телефон"
+            type="tel"
+            placeholder="+79001234567"
+            value={phone}
+            onChange={(e) => { setPhone(e.target.value); clearError(); setFieldErrors({}) }}
+            error={fieldErrors.phone}
+            autoFocus
+          />
+          <Input
+            label="Пароль"
+            type="password"
+            placeholder="Ваш пароль"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); clearError(); setFieldErrors({}) }}
+            error={fieldErrors.password}
+          />
+          <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
+            {loading ? <Spinner size="sm" className="text-white" /> : 'Войти'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
+          <Input
+            label="Телефон"
+            type="tel"
+            placeholder="+79001234567"
+            value={phone}
+            onChange={(e) => { setPhone(e.target.value); clearError(); setFieldErrors({}) }}
+            error={fieldErrors.phone}
+            autoFocus
+          />
+          <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
+            {loading ? <Spinner size="sm" className="text-white" /> : 'Получить код'}
+          </button>
+        </form>
+      )}
     </AuthLayout>
   )
 }

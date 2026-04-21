@@ -22,6 +22,7 @@ router.post('/login',
 
 router.post('/phone/send-otp', ctrl.sendPhoneOtp);
 router.post('/phone/verify-otp', ctrl.verifyPhoneOtp);
+router.post('/login-by-phone', ctrl.loginByPhonePassword);
 router.post('/telegram', ctrl.telegramLogin);
 
 router.get('/me', authenticate, ctrl.getMe);
