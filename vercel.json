@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "backend/src/index.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/src/index.js"
+    }
+  ],
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "cd backend && npm install && cd ../frontend && npm install"
+}
