@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { API_BASE_URL } from '../config/backend'
 
 const api = axios.create({
-  baseURL: 'https://yoga-backend-ehje.onrender.com/api',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 

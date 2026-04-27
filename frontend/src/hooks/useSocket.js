@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import { useAuthStore } from '../store/authStore'
+import { SOCKET_URL } from '../config/backend'
 
 let socketInstance = null
 
@@ -11,9 +12,11 @@ export const useSocket = () => {
   const getSocket = useCallback(() => {
     if (socketInstance?.connected) return socketInstance
 
-    socketInstance = io('/', {
+    socketInstance = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      timeout: 10000,
     })
 
     socketInstance.on('connect', () => {
