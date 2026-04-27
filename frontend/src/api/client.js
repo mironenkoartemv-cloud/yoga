@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'https://yoga-backend-ehje.onrender.com',
+  baseURL: 'https://yoga-backend-ehje.onrender.com/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
