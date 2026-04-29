@@ -809,8 +809,23 @@ function LegalTab() {
     }
   }
 
-  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
-  if (!profile) return null
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <Spinner />
+      <p className="font-body text-sm text-stone-400">Загружаем юридическую информацию</p>
+    </div>
+  )
+
+  if (!profile) return (
+    <div className="max-w-2xl">
+      <Alert type="error" className="mb-4">
+        {error || 'Не удалось загрузить юридическую информацию'}
+      </Alert>
+      <button onClick={load} className="btn-secondary py-2 text-xs">
+        Повторить
+      </button>
+    </div>
+  )
 
   return (
     <div className="space-y-8">
