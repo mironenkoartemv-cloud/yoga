@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { adminApi } from '../api/admin'
 import { Spinner, Alert } from '../components/ui'
 
-const TABS = ['dashboard', 'users', 'trainers', 'trainings', 'payments', 'moderation', 'legal']
+const TABS = ['dashboard', 'legal', 'users', 'trainers', 'trainings', 'payments', 'moderation']
 const TAB_LABELS = {
   dashboard:  '📊 Дашборд',
   users:      '👥 Пользователи',
@@ -16,7 +17,14 @@ const TAB_LABELS = {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState('dashboard')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'dashboard'
+  const [tab, setTab] = useState(initialTab)
+
+  const selectTab = (nextTab) => {
+    setTab(nextTab)
+    setSearchParams(nextTab === 'dashboard' ? {} : { tab: nextTab })
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
@@ -28,7 +36,7 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 p-1 bg-sand-100 rounded-2xl mb-8">
         {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
+          <button key={t} onClick={() => selectTab(t)}
             className={`px-3 py-2 rounded-xl text-xs font-body font-medium transition-all whitespace-nowrap ${
               tab === t ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
             }`}>
