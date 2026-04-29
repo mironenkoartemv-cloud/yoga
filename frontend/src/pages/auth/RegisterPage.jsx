@@ -10,13 +10,26 @@ export default function RegisterPage() {
 
   const [step, setStep] = useState(1) // 1 = ввод данных, 2 = ввод кода
   const [roleType, setRoleType] = useState('student')
-  const [form, setForm] = useState({ name: '', phone: '', password: '', confirm: '', trainerBio: '' })
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    password: '',
+    confirm: '',
+    trainerBio: '',
+    personalDataConsent: false,
+  })
   const [code, setCode] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [trainerPending, setTrainerPending] = useState(false)
 
   const set = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }))
+    setFieldErrors((fe) => ({ ...fe, [key]: null }))
+    clearError()
+  }
+
+  const setChecked = (key) => (e) => {
+    setForm((f) => ({ ...f, [key]: e.target.checked }))
     setFieldErrors((fe) => ({ ...fe, [key]: null }))
     clearError()
   }
@@ -29,6 +42,7 @@ export default function RegisterPage() {
       errs.phone = 'Формат: +79001234567'
     if (form.password.length < 6) errs.password = 'Минимум 6 символов'
     if (form.password !== form.confirm) errs.confirm = 'Пароли не совпадают'
+    if (!form.personalDataConsent) errs.personalDataConsent = 'Нужно согласие на обработку данных'
     return errs
   }
 
@@ -211,6 +225,24 @@ export default function RegisterPage() {
             />
           </div>
         )}
+
+        <label className="flex items-start gap-3 rounded-2xl bg-sand-50 border border-sand-200 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={form.personalDataConsent}
+            onChange={setChecked('personalDataConsent')}
+            className="mt-1 h-4 w-4 rounded border-sand-300 text-sage-600 focus:ring-sage-300"
+          />
+          <span className="font-body text-xs leading-relaxed text-stone-500">
+            Я соглашаюсь на обработку персональных данных и принимаю{' '}
+            <Link to="/legal/privacy" className="text-sage-600 hover:underline">согласие</Link>
+            {' '}и{' '}
+            <Link to="/legal/offer" className="text-sage-600 hover:underline">оферту</Link>.
+            {fieldErrors.personalDataConsent && (
+              <span className="block text-red-500 mt-1">{fieldErrors.personalDataConsent}</span>
+            )}
+          </span>
+        </label>
 
         <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
           {loading ? <Spinner size="sm" className="text-white" /> : 'Получить код'}

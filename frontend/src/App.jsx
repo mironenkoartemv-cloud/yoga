@@ -13,6 +13,8 @@ import RoomPage     from './pages/RoomPage'
 import ProfilePage  from './pages/ProfilePage'
 import TrainerPage  from './pages/TrainerPage'
 import AdminPage    from './pages/AdminPage'
+import ContactsPage from './pages/ContactsPage'
+import LegalPage    from './pages/LegalPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 export default function App() {
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/trainer" element={<ProtectedRoute roles={['TRAINER','ADMIN']}><TrainerPage /></ProtectedRoute>} />
         <Route path="/admin"   element={<ProtectedRoute roles={['ADMIN']}><AdminPage /></ProtectedRoute>} />
         <Route path="/training/:id" element={<TrainingPage />} />
+        <Route path="/contacts" element={<ContactsPage />} />
+        <Route path="/legal/:section" element={<LegalPage />} />
       </Route>
 
       {/* Комната — без шапки, на весь экран */}

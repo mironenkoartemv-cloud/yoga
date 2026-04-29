@@ -290,9 +290,9 @@ export default function TrainingPage() {
         ) : bookingState === 'paying' ? (
           <div className="space-y-3">
             <div className="bg-sand-50 rounded-2xl p-4 text-center">
-              <p className="font-body text-sm text-stone-600 mb-1">Тестовая оплата</p>
+              <p className="font-body text-sm text-stone-600 mb-1">Оплата банковской картой</p>
               <p className="font-body text-xs text-stone-400">
-                В реальном приложении откроется ЮKassa / СБП
+                В реальном приложении откроется платежная форма Т-Банка
               </p>
             </div>
             <button onClick={handleStubPay} className="btn-primary w-full justify-center">
@@ -331,6 +331,12 @@ export default function TrainingPage() {
             {' '}чтобы записаться
           </p>
         )}
+        <p className="text-center font-body text-xs text-stone-400 mt-4">
+          Оплачивая тренировку, вы принимаете{' '}
+          <Link to="/legal/offer" className="text-sage-600 hover:underline">оферту</Link>
+          {' '}и{' '}
+          <Link to="/legal/returns" className="text-sage-600 hover:underline">условия возврата</Link>.
+        </p>
       </div>
     </div>
   )

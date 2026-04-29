@@ -20,4 +20,9 @@ export const adminApi = {
   // Payments
   payments:       (params)     => api.get('/admin/payments', { params }),
   refund:         (id)         => api.post(`/payments/${id}/refund`),
+
+  // Legal
+  legal:          ()           => api.get('/admin/legal'),
+  updateLegalProfile: (data)   => api.put('/admin/legal/profile', data),
+  createLegalDocument: (data)  => api.post('/admin/legal/documents', data),
 }

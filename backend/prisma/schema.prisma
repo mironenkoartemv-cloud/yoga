@@ -181,3 +181,43 @@ model ModerationRequest {
 
   @@map("moderation_requests")
 }
+
+model LegalProfile {
+  id               String   @id @default("main")
+  brand            String   @default("Asana")
+  legalName        String
+  shortName        String
+  director         String
+  inn              String
+  kpp              String
+  ogrn             String
+  address          String
+  registrationDate String
+  workHours        String
+  supportPhone     String
+  supportEmail     String
+  serviceTitle      String
+  serviceDescription String
+  serviceCountry    String
+  serviceCurrency   String
+  serviceWarranty   String
+  serviceLifetime   String
+  serviceSafety     String
+  updatedAt        DateTime @updatedAt
+
+  @@map("legal_profiles")
+}
+
+model LegalDocumentVersion {
+  id            String    @id @default(uuid())
+  type          String
+  title         String
+  content       String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([type, effectiveTo])
+  @@index([type, effectiveFrom])
+  @@map("legal_document_versions")
+}

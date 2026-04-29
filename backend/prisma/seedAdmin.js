@@ -11,6 +11,14 @@ async function main() {
   const student1 = await prisma.user.findUnique({ where: { email: 'student1@yoga.app' } })
   const student2 = await prisma.user.findUnique({ where: { email: 'student2@yoga.app' } })
 
+  if (admin && !admin.phone) {
+    await prisma.user.update({
+      where: { id: admin.id },
+      data: { phone: '+79990000000' }
+    })
+    console.log('✅ Admin phone added: +79990000000')
+  }
+
   // Найдём запланированную тренировку тренера
   const scheduledTraining = await prisma.training.findFirst({
     where: { trainerId: trainer1.id, status: 'SCHEDULED' }

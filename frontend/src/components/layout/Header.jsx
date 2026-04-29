@@ -8,6 +8,7 @@ import clsx from 'clsx'
 
 const NAV_LINKS = [
   { to: '/catalog', label: 'Расписание' },
+  { to: '/contacts', label: 'Контакты' },
 ]
 
 const TRAINER_LINKS = [

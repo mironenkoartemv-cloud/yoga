@@ -21,6 +21,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       email: 'admin@yoga.app',
+      phone: '+79990000000',
       password: passwordHash,
       name: 'Администратор',
       role: 'ADMIN',

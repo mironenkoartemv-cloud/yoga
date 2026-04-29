@@ -4,7 +4,7 @@ import { ru } from 'date-fns/locale'
 import { adminApi } from '../api/admin'
 import { Spinner, Alert } from '../components/ui'
 
-const TABS = ['dashboard', 'users', 'trainers', 'trainings', 'payments', 'moderation']
+const TABS = ['dashboard', 'users', 'trainers', 'trainings', 'payments', 'moderation', 'legal']
 const TAB_LABELS = {
   dashboard:  '📊 Дашборд',
   users:      '👥 Пользователи',
@@ -12,6 +12,7 @@ const TAB_LABELS = {
   trainings:  '📅 Тренировки',
   payments:   '💳 Платежи',
   moderation: '✏️ Модерация',
+  legal:      '⚖️ Юридическое',
 }
 
 export default function AdminPage() {
@@ -42,6 +43,7 @@ export default function AdminPage() {
       {tab === 'trainings'  && <TrainingsTab />}
       {tab === 'payments'   && <PaymentsTab />}
       {tab === 'moderation' && <ModerationTab />}
+      {tab === 'legal'      && <LegalTab />}
     </div>
   )
 }
@@ -693,6 +695,255 @@ function DescriptionModerationTab() {
        )}
     </div>
   )
+}
+
+// ── Legal ─────────────────────────────────────────────
+const PROFILE_FIELDS = [
+  ['brand', 'Бренд сервиса'],
+  ['legalName', 'Полное наименование'],
+  ['shortName', 'Сокращенное наименование'],
+  ['director', 'Генеральный директор'],
+  ['inn', 'ИНН'],
+  ['kpp', 'КПП'],
+  ['ogrn', 'ОГРН'],
+  ['address', 'Юридический адрес'],
+  ['registrationDate', 'Дата регистрации'],
+  ['workHours', 'Режим работы'],
+  ['supportPhone', 'Телефон поддержки'],
+  ['supportEmail', 'Email поддержки'],
+  ['serviceTitle', 'Название услуги'],
+  ['serviceDescription', 'Описание услуги'],
+  ['serviceCountry', 'Страна оказания услуги'],
+  ['serviceCurrency', 'Валюта'],
+  ['serviceWarranty', 'Гарантийный срок / порядок оказания'],
+  ['serviceLifetime', 'Срок доступа'],
+  ['serviceSafety', 'Правила безопасного использования'],
+]
+
+const DOCUMENT_TYPES = [
+  { type: 'offer', label: 'Оферта' },
+  { type: 'privacy', label: 'Согласие на обработку ПД' },
+  { type: 'returns', label: 'Возврат и обмен' },
+]
+
+function LegalTab() {
+  const [profile, setProfile] = useState(null)
+  const [documents, setDocuments] = useState([])
+  const [selectedType, setSelectedType] = useState('offer')
+  const [docForm, setDocForm] = useState({ title: '', content: '' })
+  const [loading, setLoading] = useState(true)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    adminApi.legal()
+      .then(({ data }) => {
+        setProfile(data.profile)
+        setDocuments(Array.isArray(data.documents) ? data.documents : [])
+      })
+      .catch((err) => setError(err.response?.data?.error || 'Не удалось загрузить юридические данные'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const currentDoc = documents.find((doc) => doc.type === selectedType && !doc.effectiveTo)
+  const archiveDocs = documents.filter((doc) => doc.type === selectedType && doc.effectiveTo)
+
+  useEffect(() => {
+    setDocForm({
+      title: currentDoc?.title || DOCUMENT_TYPES.find((item) => item.type === selectedType)?.label || '',
+      content: currentDoc?.content || '',
+    })
+  }, [selectedType, currentDoc?.id])
+
+  const updateProfileField = (key, value) => {
+    setProfile((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault()
+    setSavingProfile(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const { data } = await adminApi.updateLegalProfile(profile)
+      setProfile(data)
+      setSuccess('Контакты и реквизиты обновлены')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Не удалось сохранить профиль')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  const handlePublishDocument = async (e) => {
+    e.preventDefault()
+    if (!confirm('Опубликовать новую версию документа? Текущая версия уйдет в архив.')) return
+    setPublishing(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await adminApi.createLegalDocument({
+        type: selectedType,
+        title: docForm.title,
+        content: docForm.content,
+      })
+      setSuccess('Новая версия документа опубликована')
+      load()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Не удалось опубликовать документ')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (!profile) return null
+
+  return (
+    <div className="space-y-8">
+      {error && <Alert type="error">{error}</Alert>}
+      {success && <Alert type="success">{success}</Alert>}
+
+      <section>
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="font-display text-2xl text-stone-800">Контакты и реквизиты</h2>
+            <p className="font-body text-sm text-stone-400">Эти данные обновляются на страницах контактов и реквизитов без архива.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveProfile} className="card p-4 sm:p-5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            {PROFILE_FIELDS.map(([key, label]) => {
+              const isLong = ['address', 'serviceDescription', 'serviceWarranty', 'serviceLifetime', 'serviceSafety'].includes(key)
+              return (
+                <label key={key} className={isLong ? 'sm:col-span-2' : ''}>
+                  <span className="block font-body text-xs text-stone-400 uppercase tracking-wider mb-1.5">
+                    {label}
+                  </span>
+                  {isLong ? (
+                    <textarea
+                      value={profile[key] || ''}
+                      onChange={(e) => updateProfileField(key, e.target.value)}
+                      className="input-field min-h-24 resize-y"
+                    />
+                  ) : (
+                    <input
+                      value={profile[key] || ''}
+                      onChange={(e) => updateProfileField(key, e.target.value)}
+                      className="input-field"
+                    />
+                  )}
+                </label>
+              )
+            })}
+          </div>
+          <div className="flex justify-end mt-4">
+            <button type="submit" className="btn-primary py-2 text-xs" disabled={savingProfile}>
+              {savingProfile ? <Spinner size="sm" className="text-white" /> : 'Сохранить'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="font-display text-2xl text-stone-800">Версии документов</h2>
+            <p className="font-body text-sm text-stone-400">Новая публикация сохраняет предыдущую версию в архиве сайта.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1 p-1 bg-sand-100 rounded-2xl mb-4 w-fit">
+          {DOCUMENT_TYPES.map((item) => (
+            <button
+              key={item.type}
+              type="button"
+              onClick={() => setSelectedType(item.type)}
+              className={`px-4 py-2 rounded-xl text-xs font-body font-medium transition-all ${
+                selectedType === item.type ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handlePublishDocument} className="card p-4 sm:p-5">
+          <div className="grid gap-3">
+            <label>
+              <span className="block font-body text-xs text-stone-400 uppercase tracking-wider mb-1.5">
+                Заголовок
+              </span>
+              <input
+                value={docForm.title}
+                onChange={(e) => setDocForm((f) => ({ ...f, title: e.target.value }))}
+                className="input-field"
+                required
+              />
+            </label>
+            <label>
+              <span className="block font-body text-xs text-stone-400 uppercase tracking-wider mb-1.5">
+                Текст документа
+              </span>
+              <textarea
+                value={docForm.content}
+                onChange={(e) => setDocForm((f) => ({ ...f, content: e.target.value }))}
+                className="input-field min-h-[360px] resize-y font-mono text-xs leading-relaxed"
+                required
+              />
+            </label>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
+            <p className="font-body text-xs text-stone-400">
+              Текущая версия: {currentDoc ? formatVersionRange(currentDoc) : 'не опубликована'}
+            </p>
+            <button type="submit" className="btn-primary py-2 text-xs" disabled={publishing}>
+              {publishing ? <Spinner size="sm" className="text-white" /> : 'Опубликовать новую версию'}
+            </button>
+          </div>
+        </form>
+
+        {archiveDocs.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="font-body text-xs text-stone-400 uppercase tracking-wider">Архив</p>
+            {archiveDocs.map((doc) => (
+              <details key={doc.id} className="card p-4">
+                <summary className="cursor-pointer font-body text-sm text-stone-700">
+                  {archiveLabel(doc)}
+                </summary>
+                <pre className="font-body text-xs text-stone-500 whitespace-pre-wrap mt-3 bg-sand-50 rounded-xl p-3">
+                  {doc.content}
+                </pre>
+              </details>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function archiveLabel(doc) {
+  const label = DOCUMENT_TYPES.find((item) => item.type === doc.type)?.label || doc.title
+  return `${label} с ${formatCompactDate(doc.effectiveFrom)} по ${formatCompactDate(doc.effectiveTo)}`
+}
+
+function formatVersionRange(doc) {
+  if (!doc.effectiveFrom) return 'черновик'
+  return `с ${format(new Date(doc.effectiveFrom), 'd MMM yyyy HH:mm', { locale: ru })}`
+}
+
+function formatCompactDate(value) {
+  if (!value) return ''
+  return new Date(value)
+    .toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    .replace(/\./g, '')
 }
 
 function StatCard({ label, value, color }) {

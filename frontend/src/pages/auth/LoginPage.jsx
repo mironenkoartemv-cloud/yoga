@@ -4,13 +4,16 @@ import { useAuthStore } from '../../store/authStore'
 import AuthLayout from '../../components/auth/AuthLayout'
 import { Input, Alert, Spinner } from '../../components/ui'
 
+const showEmailLogin = import.meta.env.DEV
+
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { sendOtp, verifyOtp, loginByPhone, loading, error, clearError } = useAuthStore()
+  const { sendOtp, verifyOtp, loginByPhone, loginByEmail, loading, error, clearError } = useAuthStore()
 
-  const [mode, setMode] = useState('password') // 'password' | 'sms'
+  const [mode, setMode] = useState('password') // 'password' | 'email' | 'sms'
   const [step, setStep] = useState(1) // для SMS: 1 = телефон, 2 = код
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -21,7 +24,13 @@ export default function LoginPage() {
     return null
   }
 
-  // Вход по паролю
+  const validateEmail = () => {
+    if (!email.trim()) return 'Введите email'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Неверный email'
+    return null
+  }
+
+  // Вход по телефону + паролю
   const handleLoginByPassword = async (e) => {
     e.preventDefault()
     const phoneErr = validatePhone()
@@ -31,6 +40,19 @@ export default function LoginPage() {
     if (Object.keys(errs).length) return setFieldErrors(errs)
     try {
       await loginByPhone(phone, password)
+      navigate('/catalog')
+    } catch {}
+  }
+
+  const handleLoginByEmail = async (e) => {
+    e.preventDefault()
+    const emailErr = validateEmail()
+    const errs = {}
+    if (emailErr) errs.email = emailErr
+    if (!password) errs.password = 'Введите пароль'
+    if (Object.keys(errs).length) return setFieldErrors(errs)
+    try {
+      await loginByEmail(email, password)
       navigate('/catalog')
     } catch {}
   }
@@ -58,6 +80,7 @@ export default function LoginPage() {
 
   // Переключение режима сбрасывает всё
   const switchMode = (newMode) => {
+    if (newMode === 'email' && !showEmailLogin) return
     setMode(newMode)
     setStep(1)
     setCode('')
@@ -126,8 +149,17 @@ export default function LoginPage() {
           className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
             mode === 'password' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
           }`}>
-          🔒 По паролю
+          🔒 Телефон
         </button>
+        {showEmailLogin && (
+          <button type="button"
+            onClick={() => switchMode('email')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+              mode === 'email' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+            }`}>
+            @ Email
+          </button>
+        )}
         <button type="button"
           onClick={() => switchMode('sms')}
           className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
@@ -137,7 +169,30 @@ export default function LoginPage() {
         </button>
       </div>
 
-      {mode === 'password' ? (
+      {mode === 'email' ? (
+        <form onSubmit={handleLoginByEmail} className="flex flex-col gap-4">
+          <Input
+            label="Email"
+            type="email"
+            placeholder="admin@yoga.app"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); clearError(); setFieldErrors({}) }}
+            error={fieldErrors.email}
+            autoFocus
+          />
+          <Input
+            label="Пароль"
+            type="password"
+            placeholder="Ваш пароль"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); clearError(); setFieldErrors({}) }}
+            error={fieldErrors.password}
+          />
+          <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
+            {loading ? <Spinner size="sm" className="text-white" /> : 'Войти'}
+          </button>
+        </form>
+      ) : mode === 'password' ? (
         <form onSubmit={handleLoginByPassword} className="flex flex-col gap-4">
           <Input
             label="Телефон"

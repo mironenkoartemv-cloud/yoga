@@ -3,8 +3,89 @@ const prisma = require('../config/prisma');
 const bcrypt = require('bcryptjs');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
+const { LEGAL_TYPES, ensureProfile } = require('./legal');
 
 router.use(authenticate, requireRole('ADMIN'));
+
+// ─────────────────────────────────────
+// ЮРИДИЧЕСКАЯ ИНФОРМАЦИЯ
+// ─────────────────────────────────────
+
+// GET /api/admin/legal
+router.get('/legal', async (req, res, next) => {
+  try {
+    const [profile, documents] = await Promise.all([
+      ensureProfile(),
+      prisma.legalDocumentVersion.findMany({
+        orderBy: [{ type: 'asc' }, { effectiveFrom: 'desc' }],
+      }),
+    ]);
+
+    res.json({ profile, documents });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/admin/legal/profile
+router.put('/legal/profile', async (req, res, next) => {
+  try {
+    const allowed = [
+      'brand', 'legalName', 'shortName', 'director', 'inn', 'kpp', 'ogrn',
+      'address', 'registrationDate', 'workHours', 'supportPhone', 'supportEmail',
+      'serviceTitle', 'serviceDescription', 'serviceCountry', 'serviceCurrency',
+      'serviceWarranty', 'serviceLifetime', 'serviceSafety',
+    ];
+    const data = {};
+
+    for (const key of allowed) {
+      if (typeof req.body[key] === 'string') data[key] = req.body[key].trim();
+    }
+
+    const missing = allowed.filter((key) => !data[key]);
+    if (missing.length) {
+      return res.status(400).json({ error: `Заполните поля: ${missing.join(', ')}` });
+    }
+
+    const profile = await prisma.legalProfile.upsert({
+      where: { id: 'main' },
+      create: { id: 'main', ...data },
+      update: data,
+    });
+    res.json(profile);
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/legal/documents — создать новую версию документа
+router.post('/legal/documents', [
+  body('type').isIn(LEGAL_TYPES),
+  body('title').trim().notEmpty(),
+  body('content').trim().notEmpty(),
+], async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { type, title, content } = req.body;
+    const now = new Date();
+
+    const document = await prisma.$transaction(async (tx) => {
+      await tx.legalDocumentVersion.updateMany({
+        where: { type, effectiveTo: null },
+        data: { effectiveTo: now },
+      });
+
+      return tx.legalDocumentVersion.create({
+        data: {
+          type,
+          title: title.trim(),
+          content: content.trim(),
+          effectiveFrom: now,
+        },
+      });
+    });
+
+    res.status(201).json(document);
+  } catch (err) { next(err); }
+});
 
 // ─────────────────────────────────────
 // АНАЛИТИКА

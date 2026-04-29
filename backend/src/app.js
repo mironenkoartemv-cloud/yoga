@@ -10,6 +10,7 @@ const paymentRoutes = require('./routes/payments');
 const roomRoutes = require('./routes/rooms');
 const historyRoutes = require('./routes/history');
 const adminRoutes = require('./routes/admin');
+const { router: legalRoutes } = require('./routes/legal');
 const notificationRoutes = require('./routes/notifications');
 const trainerFinanceRoutes = require('./routes/trainerFinance');
 
@@ -41,6 +42,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/legal', legalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/trainer', trainerFinanceRoutes);
