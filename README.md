@@ -89,5 +89,5 @@ npm run dev              # http://localhost:3000
 | Auth | JWT, bcrypt |
 | Payments | ЮKassa (stub) |
 | Push | Firebase (stub) |
-| SMS | SMSC.ru (stub) |
+| SMS | МТС Exolve / stub |
 | Deploy | Docker, docker-compose |

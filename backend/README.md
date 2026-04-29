@@ -17,6 +17,32 @@ cp .env.example .env
 # Заполнить DATABASE_URL и JWT_SECRET
 ```
 
+### SMS через МТС Exolve
+
+Для локальной разработки без реальной отправки оставьте:
+
+```env
+SMS_PROVIDER=stub
+```
+
+Для теста через купленный/тестовый номер Exolve (вариант A):
+
+```env
+SMS_PROVIDER=exolve
+EXOLVE_API_KEY=ваш_api_ключ_приложения
+EXOLVE_SMS_SENDER=79991112233
+```
+
+Для отправки от альфа-имени после согласования у операторов (вариант B):
+
+```env
+SMS_PROVIDER=exolve
+EXOLVE_API_KEY=ваш_api_ключ_приложения
+EXOLVE_SMS_SENDER=YogaApp
+```
+
+`EXOLVE_SMS_SENDER` должен быть либо номером Exolve, который принадлежит приложению, либо активным альфа-именем со статусом `1` в Exolve.
+
 ### 3. Запустить PostgreSQL (через Docker)
 
 ```bash
@@ -167,7 +193,7 @@ docker-compose up --build
 
 | Сервис | Файл | Что нужно |
 |--------|------|-----------|
-| SMS | `src/services/smsService.js` | API-ключ SMSC / МТС Exolve |
+| SMS | `src/services/smsService.js` | EXOLVE_API_KEY + номер или альфа-имя отправителя |
 | ЮKassa | `src/services/paymentService.js` | SHOP_ID + SECRET_KEY |
 | Firebase | `src/services/pushService.js` | Service Account JSON |
 | Telegram | `src/controllers/authController.js` | BOT_TOKEN + проверка hash |

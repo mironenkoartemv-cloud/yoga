@@ -34,6 +34,8 @@ services:
       JWT_EXPIRES_IN: 7d
       ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
       SMS_PROVIDER: stub
+      EXOLVE_API_KEY: STUB
+      EXOLVE_SMS_SENDER: STUB
       YUKASSA_SHOP_ID: STUB
       YUKASSA_SECRET_KEY: STUB
       FIREBASE_SERVICE_ACCOUNT: '{}'
