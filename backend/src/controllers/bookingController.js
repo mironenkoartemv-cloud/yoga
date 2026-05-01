@@ -25,21 +25,39 @@ const createBooking = async (req, res, next) => {
     // Бесплатная тренировка — сразу CONFIRMED
     const isPaid = training.price === 0;
 
-    const booking = await prisma.booking.create({
-      data: {
-        userId: req.user.id,
-        trainingId,
-        status: isPaid ? 'CONFIRMED' : 'PENDING',
-      },
+    const existingBooking = await prisma.booking.findUnique({
+      where: { userId_trainingId: { userId: req.user.id, trainingId } },
+      include: { payment: true },
     });
 
+    if (existingBooking && existingBooking.status !== 'CANCELLED') {
+      return res.status(409).json({ error: 'Вы уже записаны на эту тренировку' });
+    }
+
+    const booking = existingBooking
+      ? await prisma.booking.update({
+          where: { id: existingBooking.id },
+          data: { status: isPaid ? 'CONFIRMED' : 'PENDING' },
+        })
+      : await prisma.booking.create({
+          data: {
+            userId: req.user.id,
+            trainingId,
+            status: isPaid ? 'CONFIRMED' : 'PENDING',
+          },
+        });
+
     if (!isPaid) {
-      // Создаём платёж
-      const payment = await paymentService.createPayment({
-        bookingId: booking.id,
-        userId: req.user.id,
-        amount: training.price,
-      });
+      const payment = existingBooking?.payment
+        ? await paymentService.createPaymentLink({
+            paymentId: existingBooking.payment.id,
+            userId: req.user.id,
+          })
+        : await paymentService.createPayment({
+            bookingId: booking.id,
+            userId: req.user.id,
+            amount: training.price,
+          });
 
       return res.status(201).json({ booking, payment });
     }
