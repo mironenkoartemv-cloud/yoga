@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { trainingsApi } from '../api/trainings'
-import { bookingsApi } from '../api/bookings'
+import { bookingsApi, paymentsApi } from '../api/bookings'
 import { useAuthStore } from '../store/authStore'
 import { Spinner, Alert } from '../components/ui'
 
@@ -76,12 +76,29 @@ export default function TrainingPage() {
     }
   }
 
-  const handlePay = () => {
-    if (!myPayment?.confirmationUrl) {
+  const handlePay = async () => {
+    setError(null)
+
+    if (myPayment?.confirmationUrl) {
+      window.location.href = myPayment.confirmationUrl
+      return
+    }
+
+    const paymentId = myPayment?.paymentId || myPayment?.id
+    if (!paymentId) {
       setError('Ссылка на оплату недоступна. Отмените запись и попробуйте записаться снова.')
       return
     }
-    window.location.href = myPayment.confirmationUrl
+
+    setBookingState('booking')
+    try {
+      const { data } = await paymentsApi.createLink(paymentId)
+      setMyPayment(data)
+      window.location.href = data.confirmationUrl
+    } catch (err) {
+      setError(err.response?.data?.error || 'Не удалось создать ссылку на оплату')
+      setBookingState('paying')
+    }
   }
 
   const handleCancel = async () => {

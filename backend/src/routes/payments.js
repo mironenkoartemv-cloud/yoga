@@ -30,6 +30,18 @@ router.get('/:id', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/payments/:id/link — создать новую ссылку на оплату
+router.post('/:id/link', authenticate, async (req, res, next) => {
+  try {
+    const result = await paymentService.createPaymentLink({
+      paymentId: req.params.id,
+      userId: req.user.id,
+      isAdmin: req.user.role === 'ADMIN',
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // POST /api/payments/webhook — вебхук от Т-Банка
 router.post('/webhook', async (req, res, next) => {
   try {

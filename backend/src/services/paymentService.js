@@ -53,26 +53,7 @@ const getPaymentReturnUrls = () => {
   };
 };
 
-const createPayment = async ({ bookingId, userId, amount }) => {
-  if (STUB_MODE) {
-    const payment = await prisma.payment.create({
-      data: {
-        bookingId,
-        userId,
-        amount,
-        status: 'PENDING',
-        provider: 'stub',
-        externalId: `stub_${Date.now()}`,
-      },
-    });
-
-    return {
-      paymentId: payment.id,
-      confirmationUrl: `${getFrontendUrl()}/payment/success?paymentId=${payment.id}&stub=1`,
-      status: 'PENDING',
-    };
-  }
-
+const initTbankPayment = async ({ bookingId, amount }) => {
   const { successUrl, failUrl, notificationUrl } = getPaymentReturnUrls();
   if (!notificationUrl) throw new Error('TBANK_NOTIFICATION_URL не настроен');
 
@@ -99,6 +80,31 @@ const createPayment = async ({ bookingId, userId, amount }) => {
     throw new Error('Т-Банк не вернул ссылку на оплату');
   }
 
+  return data;
+};
+
+const createPayment = async ({ bookingId, userId, amount }) => {
+  if (STUB_MODE) {
+    const payment = await prisma.payment.create({
+      data: {
+        bookingId,
+        userId,
+        amount,
+        status: 'PENDING',
+        provider: 'stub',
+        externalId: `stub_${Date.now()}`,
+      },
+    });
+
+    return {
+      paymentId: payment.id,
+      confirmationUrl: `${getFrontendUrl()}/payment/success?paymentId=${payment.id}&stub=1`,
+      status: 'PENDING',
+    };
+  }
+
+  const data = await initTbankPayment({ bookingId, amount });
+
   const payment = await prisma.payment.create({
     data: {
       bookingId,
@@ -115,6 +121,56 @@ const createPayment = async ({ bookingId, userId, amount }) => {
     providerPaymentId: String(data.PaymentId),
     confirmationUrl: data.PaymentURL,
     status: payment.status,
+  };
+};
+
+const createPaymentLink = async ({ paymentId, userId, isAdmin = false }) => {
+  const payment = await prisma.payment.findUniqueOrThrow({
+    where: { id: paymentId },
+    include: { booking: true },
+  });
+
+  if (payment.userId !== userId && !isAdmin) {
+    const error = new Error('Нет доступа');
+    error.status = 403;
+    throw error;
+  }
+
+  if (payment.status === 'PAID') {
+    const error = new Error('Платеж уже оплачен');
+    error.status = 400;
+    throw error;
+  }
+
+  if (payment.booking.status === 'CANCELLED') {
+    const error = new Error('Запись отменена');
+    error.status = 400;
+    throw error;
+  }
+
+  if (STUB_MODE) {
+    return {
+      paymentId: payment.id,
+      confirmationUrl: `${getFrontendUrl()}/payment/success?paymentId=${payment.id}&stub=1`,
+      status: payment.status,
+    };
+  }
+
+  const data = await initTbankPayment({ bookingId: payment.bookingId, amount: payment.amount });
+  const updatedPayment = await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      provider: 'tbank',
+      externalId: String(data.PaymentId),
+      status: 'PENDING',
+    },
+  });
+
+  return {
+    paymentId: updatedPayment.id,
+    providerPaymentId: String(data.PaymentId),
+    confirmationUrl: data.PaymentURL,
+    status: updatedPayment.status,
   };
 };
 
@@ -218,6 +274,7 @@ const refundPayment = async (paymentId) => {
 
 module.exports = {
   createPayment,
+  createPaymentLink,
   getPaymentStatus,
   handleWebhook,
   stubConfirmPayment,
