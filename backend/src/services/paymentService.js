@@ -53,6 +53,12 @@ const getPaymentReturnUrls = () => {
   };
 };
 
+const makeTbankOrderId = (bookingId) => {
+  const compactBookingId = bookingId.replace(/-/g, '').slice(0, 20);
+  const uniqueSuffix = Date.now().toString(36);
+  return `${compactBookingId}${uniqueSuffix}`;
+};
+
 const initTbankPayment = async ({ bookingId, amount }) => {
   const { successUrl, failUrl, notificationUrl } = getPaymentReturnUrls();
   if (!notificationUrl) throw new Error('TBANK_NOTIFICATION_URL не настроен');
@@ -60,7 +66,7 @@ const initTbankPayment = async ({ bookingId, amount }) => {
   const payload = {
     TerminalKey: TBANK_TERMINAL_KEY,
     Amount: amount,
-    OrderId: bookingId,
+    OrderId: makeTbankOrderId(bookingId),
     Description: `Оплата тренировки #${bookingId}`,
     PayType: 'O',
     SuccessURL: successUrl,
