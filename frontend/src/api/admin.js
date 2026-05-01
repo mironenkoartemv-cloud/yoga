@@ -19,6 +19,7 @@ export const adminApi = {
 
   // Payments
   payments:       (params)     => api.get('/admin/payments', { params }),
+  syncPayment:    (id)         => api.post(`/payments/${id}/sync`),
   refund:         (id)         => api.post(`/payments/${id}/refund`),
 
   // Legal

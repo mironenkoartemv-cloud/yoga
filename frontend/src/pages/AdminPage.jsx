@@ -432,6 +432,15 @@ function PaymentsTab() {
     }
   }
 
+  const handleSyncPayment = async (id) => {
+    try {
+      await adminApi.syncPayment(id)
+      load()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Не удалось обновить статус платежа')
+    }
+  }
+
   const totalRevenue = payments.filter(p => p.status === 'PAID').reduce((s, p) => s + p.amount, 0)
 
   const STATUS_COLOR = { PENDING: 'bg-sand-100 text-sand-700', PAID: 'bg-sage-100 text-sage-700', REFUNDED: 'bg-stone-100 text-stone-500', FAILED: 'bg-red-100 text-red-500' }
@@ -478,10 +487,16 @@ function PaymentsTab() {
                 {(p.amount / 100).toLocaleString('ru-RU')} ₽
               </p>
               {p.status === 'PAID' && (
-                <button onClick={() => handleRefund(p.id)}
-                  className="px-2.5 py-1 rounded-xl text-xs font-body bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0">
-                  Возврат
-                </button>
+                <>
+                  <button onClick={() => handleSyncPayment(p.id)}
+                    className="px-2.5 py-1 rounded-xl text-xs font-body bg-sand-100 text-stone-500 hover:bg-sand-200 transition-colors shrink-0">
+                    Обновить
+                  </button>
+                  <button onClick={() => handleRefund(p.id)}
+                    className="px-2.5 py-1 rounded-xl text-xs font-body bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0">
+                    Возврат
+                  </button>
+                </>
               )}
             </div>
           ))}

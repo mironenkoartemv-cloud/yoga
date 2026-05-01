@@ -202,10 +202,36 @@ const getPaymentStatus = async (paymentId) => {
   return payment;
 };
 
+const markPaymentPaid = async (payment) => {
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'PAID' },
+    }),
+    prisma.booking.update({
+      where: { id: payment.bookingId },
+      data: { status: 'CONFIRMED' },
+    }),
+  ]);
+};
+
+const markPaymentRefunded = async (payment) => {
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'REFUNDED' },
+    }),
+    prisma.booking.update({
+      where: { id: payment.bookingId },
+      data: { status: 'CANCELLED' },
+    }),
+  ]);
+};
+
 const syncPaymentStatus = async (paymentId) => {
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
 
-  if (STUB_MODE || payment.provider !== 'tbank' || !payment.externalId || payment.status !== 'PENDING') {
+  if (STUB_MODE || payment.provider !== 'tbank' || !payment.externalId) {
     return payment;
   }
 
@@ -227,6 +253,11 @@ const syncPaymentStatus = async (paymentId) => {
     return prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
   }
 
+  if (['REFUNDED', 'PARTIAL_REFUNDED', 'REVERSED', 'PARTIAL_REVERSED'].includes(data.Status)) {
+    await markPaymentRefunded(payment);
+    return prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  }
+
   if (['REJECTED', 'DEADLINE_EXPIRED', 'AUTH_FAIL'].includes(data.Status)) {
     return prisma.payment.update({
       where: { id: paymentId },
@@ -235,19 +266,6 @@ const syncPaymentStatus = async (paymentId) => {
   }
 
   return payment;
-};
-
-const markPaymentPaid = async (payment) => {
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: 'PAID' },
-    }),
-    prisma.booking.update({
-      where: { id: payment.bookingId },
-      data: { status: 'CONFIRMED' },
-    }),
-  ]);
 };
 
 const handleWebhook = async (event) => {
@@ -276,10 +294,7 @@ const handleWebhook = async (event) => {
   }
 
   if (['REFUNDED', 'PARTIAL_REFUNDED', 'REVERSED', 'PARTIAL_REVERSED'].includes(event.Status)) {
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: 'REFUNDED' },
-    });
+    await markPaymentRefunded(payment);
   }
 };
 
@@ -296,10 +311,7 @@ const refundPayment = async (paymentId) => {
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
 
   if (STUB_MODE || payment.provider !== 'tbank') {
-    await prisma.payment.update({
-      where: { id: paymentId },
-      data: { status: 'REFUNDED' },
-    });
+    await markPaymentRefunded(payment);
     return { message: 'Возврат выполнен (stub)' };
   }
 
@@ -317,10 +329,7 @@ const refundPayment = async (paymentId) => {
 
   assertTbankSuccess(data, 'Не удалось выполнить возврат в Т-Банке');
 
-  await prisma.payment.update({
-    where: { id: paymentId },
-    data: { status: 'REFUNDED' },
-  });
+  await markPaymentRefunded(payment);
 
   return { message: 'Возврат выполнен' };
 };
