@@ -17,11 +17,23 @@ export default function PaymentResultPage({ status }) {
     if (!paymentId || !isAuthenticated()) return
 
     setLoading(true)
-    paymentsApi.get(paymentId)
+    paymentsApi.sync(paymentId)
       .then(({ data }) => setPaymentStatus(data.status))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [paymentId, isAuthenticated])
+
+  useEffect(() => {
+    if (!paymentId || !isAuthenticated() || paymentStatus !== 'PENDING') return
+
+    const intervalId = setInterval(() => {
+      paymentsApi.sync(paymentId)
+        .then(({ data }) => setPaymentStatus(data.status))
+        .catch(() => {})
+    }, 3000)
+
+    return () => clearInterval(intervalId)
+  }, [paymentId, paymentStatus, isAuthenticated])
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-20">
@@ -31,11 +43,13 @@ export default function PaymentResultPage({ status }) {
         </div>
 
         <h1 className="font-display text-3xl md:text-4xl text-stone-700">
-          {isSuccess ? 'Оплата обрабатывается' : 'Оплата не завершена'}
+          {paymentStatus === 'PAID' ? 'Оплата прошла' : isSuccess ? 'Оплата обрабатывается' : 'Оплата не завершена'}
         </h1>
 
         <p className="font-body text-stone-500 mt-3">
-          {isSuccess
+          {paymentStatus === 'PAID'
+            ? 'Запись подтверждена. Она уже доступна в вашем профиле.'
+            : isSuccess
             ? 'Как только Т-Банк подтвердит платеж, запись появится в профиле как оплаченная.'
             : 'Платеж можно попробовать провести еще раз со страницы тренировки.'}
         </p>

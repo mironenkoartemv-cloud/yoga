@@ -59,7 +59,12 @@ const makeTbankOrderId = (bookingId) => {
   return `${compactBookingId}${uniqueSuffix}`;
 };
 
-const initTbankPayment = async ({ bookingId, amount }) => {
+const withPaymentIdParam = (url, paymentId) => {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}paymentId=${encodeURIComponent(paymentId)}`;
+};
+
+const initTbankPayment = async ({ bookingId, localPaymentId, amount }) => {
   const { successUrl, failUrl, notificationUrl } = getPaymentReturnUrls();
   if (!notificationUrl) throw new Error('TBANK_NOTIFICATION_URL не настроен');
 
@@ -69,8 +74,8 @@ const initTbankPayment = async ({ bookingId, amount }) => {
     OrderId: makeTbankOrderId(bookingId),
     Description: `Оплата тренировки #${bookingId}`,
     PayType: 'O',
-    SuccessURL: successUrl,
-    FailURL: failUrl,
+    SuccessURL: withPaymentIdParam(successUrl, localPaymentId),
+    FailURL: withPaymentIdParam(failUrl, localPaymentId),
     NotificationURL: notificationUrl,
   };
 
@@ -109,8 +114,6 @@ const createPayment = async ({ bookingId, userId, amount }) => {
     };
   }
 
-  const data = await initTbankPayment({ bookingId, amount });
-
   const payment = await prisma.payment.create({
     data: {
       bookingId,
@@ -118,15 +121,20 @@ const createPayment = async ({ bookingId, userId, amount }) => {
       amount,
       status: 'PENDING',
       provider: 'tbank',
-      externalId: String(data.PaymentId),
     },
   });
 
+  const data = await initTbankPayment({ bookingId, localPaymentId: payment.id, amount });
+  const updatedPayment = await prisma.payment.update({
+    where: { id: payment.id },
+    data: { externalId: String(data.PaymentId) },
+  });
+
   return {
-    paymentId: payment.id,
+    paymentId: updatedPayment.id,
     providerPaymentId: String(data.PaymentId),
     confirmationUrl: data.PaymentURL,
-    status: payment.status,
+    status: updatedPayment.status,
   };
 };
 
@@ -162,7 +170,11 @@ const createPaymentLink = async ({ paymentId, userId, isAdmin = false }) => {
     };
   }
 
-  const data = await initTbankPayment({ bookingId: payment.bookingId, amount: payment.amount });
+  const data = await initTbankPayment({
+    bookingId: payment.bookingId,
+    localPaymentId: payment.id,
+    amount: payment.amount,
+  });
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
     data: {
@@ -187,6 +199,41 @@ const verifyTbankToken = (payload) => {
 
 const getPaymentStatus = async (paymentId) => {
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  return payment;
+};
+
+const syncPaymentStatus = async (paymentId) => {
+  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+
+  if (STUB_MODE || payment.provider !== 'tbank' || !payment.externalId || payment.status !== 'PENDING') {
+    return payment;
+  }
+
+  const payload = {
+    TerminalKey: TBANK_TERMINAL_KEY,
+    PaymentId: payment.externalId,
+  };
+  payload.Token = makeToken(payload);
+
+  const { data } = await axios.post(`${TBANK_API_URL}/GetState`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 15000,
+  });
+
+  assertTbankSuccess(data, 'Не удалось получить статус платежа в Т-Банке');
+
+  if (data.Status === 'CONFIRMED') {
+    await markPaymentPaid(payment);
+    return prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  }
+
+  if (['REJECTED', 'DEADLINE_EXPIRED', 'AUTH_FAIL'].includes(data.Status)) {
+    return prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: 'FAILED' },
+    });
+  }
+
   return payment;
 };
 
@@ -282,6 +329,7 @@ module.exports = {
   createPayment,
   createPaymentLink,
   getPaymentStatus,
+  syncPaymentStatus,
   handleWebhook,
   stubConfirmPayment,
   refundPayment,

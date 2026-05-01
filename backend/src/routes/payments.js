@@ -30,6 +30,19 @@ router.get('/:id', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/payments/:id/sync — сверить статус с Т-Банком
+router.post('/:id/sync', authenticate, async (req, res, next) => {
+  try {
+    const payment = await paymentService.getPaymentStatus(req.params.id);
+    if (payment.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+
+    const syncedPayment = await paymentService.syncPaymentStatus(req.params.id);
+    res.json(syncedPayment);
+  } catch (err) { next(err); }
+});
+
 // POST /api/payments/:id/link — создать новую ссылку на оплату
 router.post('/:id/link', authenticate, async (req, res, next) => {
   try {
