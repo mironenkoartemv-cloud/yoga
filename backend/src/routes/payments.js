@@ -19,11 +19,22 @@ router.get('/my', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/payments/webhook — вебхук от ЮKassa
+// GET /api/payments/:id — статус платежа
+router.get('/:id', authenticate, async (req, res, next) => {
+  try {
+    const payment = await paymentService.getPaymentStatus(req.params.id);
+    if (payment.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Нет доступа' });
+    }
+    res.json(payment);
+  } catch (err) { next(err); }
+});
+
+// POST /api/payments/webhook — вебхук от Т-Банка
 router.post('/webhook', async (req, res, next) => {
   try {
     await paymentService.handleWebhook(req.body);
-    res.json({ ok: true });
+    res.send('OK');
   } catch (err) { next(err); }
 });
 

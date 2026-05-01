@@ -1,28 +1,60 @@
 /**
  * Payment Service
- * 
- * STUB — реализует заглушку платежей.
- * 
- * Для боевого режима заменить на реальный SDK ЮKassa:
- *   npm install @a2seven/yoo-checkout
- * 
- * Документация:
- *   https://yookassa.ru/developers/api
- *   https://github.com/a2seven/yoo-checkout
- * 
- * Нужные ключи в .env:
- *   YUKASSA_SHOP_ID=...
- *   YUKASSA_SECRET_KEY=...
- *   YUKASSA_RETURN_URL=...
+ *
+ * T-Bank internet acquiring integration. In production the app creates a
+ * payment through /v2/Init, stores T-Bank PaymentId in Payment.externalId and
+ * confirms bookings from T-Bank webhooks.
  */
 
+const crypto = require('crypto');
+const axios = require('axios');
 const prisma = require('../config/prisma');
 
-const STUB_MODE = !process.env.YUKASSA_SHOP_ID || process.env.YUKASSA_SHOP_ID === 'STUB';
+const TBANK_API_URL = process.env.TBANK_API_URL || 'https://securepay.tinkoff.ru/v2';
+const TBANK_TERMINAL_KEY = process.env.TBANK_TERMINAL_KEY;
+const TBANK_PASSWORD = process.env.TBANK_PASSWORD;
+const STUB_MODE = !TBANK_TERMINAL_KEY || !TBANK_PASSWORD || TBANK_TERMINAL_KEY === 'STUB';
+
+const getFrontendUrl = () => process.env.FRONTEND_URL || process.env.TBANK_SUCCESS_URL?.replace('/payment/success', '') || 'http://localhost:5173';
+
+const makeToken = (payload) => {
+  if (!TBANK_PASSWORD) throw new Error('TBANK_PASSWORD не настроен');
+
+  const tokenPayload = {
+    ...Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value))
+    ),
+    Password: TBANK_PASSWORD,
+  };
+
+  delete tokenPayload.Token;
+
+  const values = Object.keys(tokenPayload)
+    .sort()
+    .map((key) => String(tokenPayload[key]))
+    .join('');
+
+  return crypto.createHash('sha256').update(values, 'utf8').digest('hex');
+};
+
+const assertTbankSuccess = (data, fallbackMessage) => {
+  if (data?.Success) return;
+  const details = [data?.Message, data?.Details, data?.ErrorCode].filter(Boolean).join(' ');
+  throw new Error(details || fallbackMessage);
+};
+
+const getPaymentReturnUrls = () => {
+  const frontendUrl = getFrontendUrl();
+
+  return {
+    successUrl: process.env.TBANK_SUCCESS_URL || `${frontendUrl}/payment/success`,
+    failUrl: process.env.TBANK_FAIL_URL || `${frontendUrl}/payment/fail`,
+    notificationUrl: process.env.TBANK_NOTIFICATION_URL,
+  };
+};
 
 const createPayment = async ({ bookingId, userId, amount }) => {
   if (STUB_MODE) {
-    // Сразу создаём платёж со статусом PENDING и фейковым confirmationUrl
     const payment = await prisma.payment.create({
       data: {
         bookingId,
@@ -36,51 +68,67 @@ const createPayment = async ({ bookingId, userId, amount }) => {
 
     return {
       paymentId: payment.id,
-      // В реальной ЮKassa здесь будет URL для редиректа пользователя
-      confirmationUrl: `${process.env.YUKASSA_RETURN_URL || 'http://localhost:3000'}/payment/stub?paymentId=${payment.id}`,
+      confirmationUrl: `${getFrontendUrl()}/payment/success?paymentId=${payment.id}&stub=1`,
       status: 'PENDING',
     };
   }
 
-  // TODO: реальная интеграция ЮKassa
-  // const { YooCheckout } = require('@a2seven/yoo-checkout');
-  // const checkout = new YooCheckout({
-  //   shopId: process.env.YUKASSA_SHOP_ID,
-  //   secretKey: process.env.YUKASSA_SECRET_KEY,
-  // });
-  //
-  // const idempotenceKey = require('uuid').v4();
-  // const paymentData = await checkout.createPayment({
-  //   amount: { value: (amount / 100).toFixed(2), currency: 'RUB' },
-  //   payment_method_data: { type: 'sbp' }, // или 'bank_card'
-  //   confirmation: { type: 'redirect', return_url: process.env.YUKASSA_RETURN_URL },
-  //   description: `Оплата тренировки #${bookingId}`,
-  // }, idempotenceKey);
-  //
-  // const payment = await prisma.payment.create({
-  //   data: {
-  //     bookingId, userId, amount,
-  //     status: 'PENDING',
-  //     provider: 'yukassa',
-  //     externalId: paymentData.id,
-  //   },
-  // });
-  //
-  // return { paymentId: payment.id, confirmationUrl: paymentData.confirmation.confirmation_url };
+  const { successUrl, failUrl, notificationUrl } = getPaymentReturnUrls();
+  if (!notificationUrl) throw new Error('TBANK_NOTIFICATION_URL не настроен');
+
+  const payload = {
+    TerminalKey: TBANK_TERMINAL_KEY,
+    Amount: amount,
+    OrderId: bookingId,
+    Description: `Оплата тренировки #${bookingId}`,
+    PayType: 'O',
+    SuccessURL: successUrl,
+    FailURL: failUrl,
+    NotificationURL: notificationUrl,
+  };
+
+  payload.Token = makeToken(payload);
+
+  const { data } = await axios.post(`${TBANK_API_URL}/Init`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 15000,
+  });
+
+  assertTbankSuccess(data, 'Не удалось создать платеж в Т-Банке');
+  if (!data.PaymentURL || !data.PaymentId) {
+    throw new Error('Т-Банк не вернул ссылку на оплату');
+  }
+
+  const payment = await prisma.payment.create({
+    data: {
+      bookingId,
+      userId,
+      amount,
+      status: 'PENDING',
+      provider: 'tbank',
+      externalId: String(data.PaymentId),
+    },
+  });
+
+  return {
+    paymentId: payment.id,
+    providerPaymentId: String(data.PaymentId),
+    confirmationUrl: data.PaymentURL,
+    status: payment.status,
+  };
 };
 
-// Webhook от ЮKassa — подтверждение оплаты
-const handleWebhook = async (event) => {
-  if (STUB_MODE) return;
+const verifyTbankToken = (payload) => {
+  if (STUB_MODE) return true;
+  return payload?.Token && payload.Token === makeToken(payload);
+};
 
-  const { object: paymentData } = event;
-  if (paymentData.status !== 'succeeded') return;
+const getPaymentStatus = async (paymentId) => {
+  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  return payment;
+};
 
-  const payment = await prisma.payment.findFirst({
-    where: { externalId: paymentData.id },
-  });
-  if (!payment) return;
-
+const markPaymentPaid = async (payment) => {
   await prisma.$transaction([
     prisma.payment.update({
       where: { id: payment.id },
@@ -93,28 +141,52 @@ const handleWebhook = async (event) => {
   ]);
 };
 
-// Заглушка подтверждения оплаты (только для dev)
+const handleWebhook = async (event) => {
+  if (STUB_MODE) return;
+  if (!verifyTbankToken(event)) {
+    const error = new Error('Некорректная подпись webhook Т-Банка');
+    error.status = 401;
+    throw error;
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: { externalId: String(event.PaymentId), provider: 'tbank' },
+  });
+  if (!payment) return;
+
+  if (event.Status === 'CONFIRMED') {
+    await markPaymentPaid(payment);
+    return;
+  }
+
+  if (['REJECTED', 'DEADLINE_EXPIRED'].includes(event.Status)) {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'FAILED' },
+    });
+  }
+
+  if (['REFUNDED', 'PARTIAL_REFUNDED', 'REVERSED', 'PARTIAL_REVERSED'].includes(event.Status)) {
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'REFUNDED' },
+    });
+  }
+};
+
 const stubConfirmPayment = async (paymentId) => {
   if (!STUB_MODE) throw new Error('Доступно только в stub режиме');
 
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  await markPaymentPaid(payment);
 
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: paymentId },
-      data: { status: 'PAID' },
-    }),
-    prisma.booking.update({
-      where: { id: payment.bookingId },
-      data: { status: 'CONFIRMED' },
-    }),
-  ]);
-
-  return { message: 'Платёж подтверждён (stub)' };
+  return { message: 'Платеж подтвержден (stub)' };
 };
 
 const refundPayment = async (paymentId) => {
-  if (STUB_MODE) {
+  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+
+  if (STUB_MODE || payment.provider !== 'tbank') {
     await prisma.payment.update({
       where: { id: paymentId },
       data: { status: 'REFUNDED' },
@@ -122,8 +194,32 @@ const refundPayment = async (paymentId) => {
     return { message: 'Возврат выполнен (stub)' };
   }
 
-  // TODO: реальный возврат через ЮKassa
-  // checkout.createRefund({ amount: {...}, payment_id: externalId }, idempotenceKey)
+  const payload = {
+    TerminalKey: TBANK_TERMINAL_KEY,
+    PaymentId: payment.externalId,
+    Amount: payment.amount,
+  };
+  payload.Token = makeToken(payload);
+
+  const { data } = await axios.post(`${TBANK_API_URL}/Cancel`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 15000,
+  });
+
+  assertTbankSuccess(data, 'Не удалось выполнить возврат в Т-Банке');
+
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: { status: 'REFUNDED' },
+  });
+
+  return { message: 'Возврат выполнен' };
 };
 
-module.exports = { createPayment, handleWebhook, stubConfirmPayment, refundPayment };
+module.exports = {
+  createPayment,
+  getPaymentStatus,
+  handleWebhook,
+  stubConfirmPayment,
+  refundPayment,
+};

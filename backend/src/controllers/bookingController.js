@@ -93,7 +93,7 @@ const myBookings = async (req, res, next) => {
             trainer: { select: { id: true, name: true, avatarUrl: true } },
           },
         },
-        payment: { select: { status: true, amount: true } },
+        payment: { select: { id: true, status: true, amount: true, provider: true, externalId: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

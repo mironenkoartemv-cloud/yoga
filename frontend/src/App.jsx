@@ -15,6 +15,7 @@ import TrainerPage  from './pages/TrainerPage'
 import AdminPage    from './pages/AdminPage'
 import ContactsPage from './pages/ContactsPage'
 import LegalPage    from './pages/LegalPage'
+import PaymentResultPage from './pages/PaymentResultPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 export default function App() {
@@ -36,6 +37,8 @@ export default function App() {
         <Route path="/trainer" element={<ProtectedRoute roles={['TRAINER','ADMIN']}><TrainerPage /></ProtectedRoute>} />
         <Route path="/admin"   element={<ProtectedRoute roles={['ADMIN']}><AdminPage /></ProtectedRoute>} />
         <Route path="/training/:id" element={<TrainingPage />} />
+        <Route path="/payment/success" element={<PaymentResultPage status="success" />} />
+        <Route path="/payment/fail" element={<PaymentResultPage status="fail" />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/legal/:section" element={<LegalPage />} />
       </Route>

@@ -9,6 +9,7 @@ export const bookingsApi = {
 
 export const paymentsApi = {
   my:           ()          => api.get('/payments/my'),
+  get:          (paymentId) => api.get(`/payments/${paymentId}`),
   stubConfirm:  (paymentId) => api.post('/payments/stub-confirm', { paymentId }),
   refund:       (id)        => api.post(`/payments/${id}/refund`),
 }

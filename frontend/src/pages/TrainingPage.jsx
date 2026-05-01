@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { trainingsApi } from '../api/trainings'
-import { bookingsApi, paymentsApi } from '../api/bookings'
+import { bookingsApi } from '../api/bookings'
 import { useAuthStore } from '../store/authStore'
 import { Spinner, Alert } from '../components/ui'
 
@@ -76,21 +76,12 @@ export default function TrainingPage() {
     }
   }
 
-  // Шаг 2: "оплатить" через stub
-  const handleStubPay = async () => {
-    if (!myPayment) return
-    setBookingState('booking')
-    setError(null)
-    try {
-      await paymentsApi.stubConfirm(myPayment.paymentId || myPayment.id)
-      setBookingState('done')
-      setPayMsg('Оплата прошла успешно!')
-      loadTraining()
-      loadMyBooking()
-    } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка оплаты')
-      setBookingState('paying')
+  const handlePay = () => {
+    if (!myPayment?.confirmationUrl) {
+      setError('Ссылка на оплату недоступна. Отмените запись и попробуйте записаться снова.')
+      return
     }
+    window.location.href = myPayment.confirmationUrl
   }
 
   const handleCancel = async () => {
@@ -292,11 +283,11 @@ export default function TrainingPage() {
             <div className="bg-sand-50 rounded-2xl p-4 text-center">
               <p className="font-body text-sm text-stone-600 mb-1">Оплата банковской картой</p>
               <p className="font-body text-xs text-stone-400">
-                В реальном приложении откроется платежная форма Т-Банка
+                Оплата откроется на защищенной странице Т-Банка
               </p>
             </div>
-            <button onClick={handleStubPay} className="btn-primary w-full justify-center">
-              💳 Оплатить {(training.price / 100).toLocaleString('ru-RU')} ₽ (stub)
+            <button onClick={handlePay} className="btn-primary w-full justify-center">
+              Оплатить {(training.price / 100).toLocaleString('ru-RU')} ₽
             </button>
             <button onClick={handleCancel} className="btn-ghost w-full text-stone-400">
               Отменить запись
