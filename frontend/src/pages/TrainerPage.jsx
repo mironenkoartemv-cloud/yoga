@@ -5,6 +5,7 @@ import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../store/authStore'
 import { trainingsApi } from '../api/trainings'
 import { bookingsApi, paymentsApi } from '../api/bookings'
+import api from '../api/client'
 import { Spinner, Alert } from '../components/ui'
 
 const TABS = ['upcoming', 'past', 'students', 'finance']
@@ -466,10 +467,10 @@ function FinanceTab() {
     if (f) params.set('from', f)
     if (t) params.set('to', t)
 
-    const token = sessionStorage.getItem('token')
-    fetch(`/api/trainer/finance?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json()).then(setData).finally(() => setLoading(false))
+    api.get('/trainer/finance', { params: Object.fromEntries(params) })
+      .then(({ data }) => setData(data))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [period])

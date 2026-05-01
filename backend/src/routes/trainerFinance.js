@@ -10,15 +10,15 @@ router.get('/finance', authenticate, requireRole('TRAINER', 'ADMIN'), async (req
 
     const where = {
       status: 'PAID',
+      ...(from || to ? {
+        createdAt: {
+          ...(from ? { gte: new Date(from) } : {}),
+          ...(to   ? { lte: new Date(to)   } : {}),
+        },
+      } : {}),
       booking: {
         training: {
           trainerId,
-          ...(from || to ? {
-            startAt: {
-              ...(from ? { gte: new Date(from) } : {}),
-              ...(to   ? { lte: new Date(to)   } : {}),
-            }
-          } : {}),
         },
       },
     };
@@ -43,7 +43,7 @@ router.get('/finance', authenticate, requireRole('TRAINER', 'ADMIN'), async (req
     // Агрегация по дням для графика
     const byDay = {};
     payments.forEach(p => {
-      const day = new Date(p.booking.training.startAt).toISOString().slice(0, 10);
+      const day = new Date(p.createdAt).toISOString().slice(0, 10);
       if (!byDay[day]) byDay[day] = { date: day, amount: 0, count: 0 };
       byDay[day].amount += p.amount;
       byDay[day].count++;
@@ -87,7 +87,8 @@ router.get('/finance', authenticate, requireRole('TRAINER', 'ADMIN'), async (req
       payments: payments.map(p => ({
         id: p.id,
         amount: p.amount,
-        date: p.booking.training.startAt,
+        date: p.createdAt,
+        trainingDate: p.booking.training.startAt,
         trainingTitle: p.booking.training.title,
         studentName: p.booking.user.name,
       })),
