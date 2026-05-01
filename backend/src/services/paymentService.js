@@ -64,7 +64,65 @@ const withPaymentIdParam = (url, paymentId) => {
   return `${url}${separator}paymentId=${encodeURIComponent(paymentId)}`;
 };
 
-const initTbankPayment = async ({ bookingId, localPaymentId, amount }) => {
+const normalizeReceiptPhone = (phone) => {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 11 && digits.startsWith('8')) return `+7${digits.slice(1)}`;
+  return digits.startsWith('7') ? `+${digits}` : `+${digits}`;
+};
+
+const trimReceiptName = (name) => String(name || 'Онлайн-тренировка').slice(0, 128);
+
+const getReceiptContact = (user) => {
+  if (user?.email) return { Email: user.email };
+
+  const phone = normalizeReceiptPhone(user?.phone || process.env.TBANK_RECEIPT_PHONE);
+  if (phone) return { Phone: phone };
+
+  if (process.env.TBANK_RECEIPT_EMAIL) return { Email: process.env.TBANK_RECEIPT_EMAIL };
+
+  throw new Error('Для формирования чека нужен email или телефон покупателя');
+};
+
+const buildReceipt = ({ user, training, amount }) => {
+  if (process.env.TBANK_RECEIPT_ENABLED === 'false') return null;
+
+  const itemName = trimReceiptName(process.env.TBANK_RECEIPT_ITEM_NAME || training?.title || 'Онлайн-тренировка');
+
+  return {
+    ...getReceiptContact(user),
+    Taxation: process.env.TBANK_RECEIPT_TAXATION || 'usn_income',
+    Items: [
+      {
+        Name: itemName,
+        Price: amount,
+        Quantity: 1,
+        Amount: amount,
+        Tax: process.env.TBANK_RECEIPT_TAX || 'none',
+        PaymentMethod: process.env.TBANK_RECEIPT_PAYMENT_METHOD || 'full_payment',
+        PaymentObject: process.env.TBANK_RECEIPT_PAYMENT_OBJECT || 'service',
+      },
+    ],
+  };
+};
+
+const getPaymentContext = async ({ bookingId, userId }) => {
+  const [booking, user] = await Promise.all([
+    prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { training: { select: { title: true } } },
+    }),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true, phone: true },
+    }),
+  ]);
+
+  return { booking, user, training: booking.training };
+};
+
+const initTbankPayment = async ({ bookingId, localPaymentId, amount, receipt }) => {
   const { successUrl, failUrl, notificationUrl } = getPaymentReturnUrls();
   if (!notificationUrl) throw new Error('TBANK_NOTIFICATION_URL не настроен');
 
@@ -78,6 +136,8 @@ const initTbankPayment = async ({ bookingId, localPaymentId, amount }) => {
     FailURL: withPaymentIdParam(failUrl, localPaymentId),
     NotificationURL: notificationUrl,
   };
+
+  if (receipt) payload.Receipt = receipt;
 
   payload.Token = makeToken(payload);
 
@@ -124,7 +184,13 @@ const createPayment = async ({ bookingId, userId, amount }) => {
     },
   });
 
-  const data = await initTbankPayment({ bookingId, localPaymentId: payment.id, amount });
+  const { user, training } = await getPaymentContext({ bookingId, userId });
+  const data = await initTbankPayment({
+    bookingId,
+    localPaymentId: payment.id,
+    amount,
+    receipt: buildReceipt({ user, training, amount }),
+  });
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
     data: { externalId: String(data.PaymentId) },
@@ -170,10 +236,15 @@ const createPaymentLink = async ({ paymentId, userId, isAdmin = false }) => {
     };
   }
 
+  const { user, training } = await getPaymentContext({
+    bookingId: payment.bookingId,
+    userId: payment.userId,
+  });
   const data = await initTbankPayment({
     bookingId: payment.bookingId,
     localPaymentId: payment.id,
     amount: payment.amount,
+    receipt: buildReceipt({ user, training, amount: payment.amount }),
   });
   const updatedPayment = await prisma.payment.update({
     where: { id: payment.id },
