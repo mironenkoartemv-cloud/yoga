@@ -18,6 +18,7 @@ export default function TrainingCard({ training, discount }) {
   const isFull    = availableSlots <= 0
   const isFree    = price === 0
   const discountedPrice = discount && !isFree ? Math.round(price * (100 - discount.percent) / 100) : null
+  const hasDiscount = Boolean(discountedPrice)
   const startDate = new Date(startAt)
   const isToday   = new Date().toDateString() === startDate.toDateString()
   const isSoon    = startDate - Date.now() < 60 * 60 * 1000 // < 1 час
@@ -61,9 +62,9 @@ export default function TrainingCard({ training, discount }) {
 
       {/* Title */}
       <div>
-        {discount && (
-          <span className="inline-flex mb-2 rounded-xl bg-sage-600 px-2.5 py-1 text-[11px] font-body font-semibold text-white">
-            -{discount.percent}% по вашей скидке
+        {hasDiscount && (
+          <span className="inline-flex mb-2 rounded-lg bg-sage-600 px-2 py-0.5 text-[10px] font-body font-semibold text-white">
+            Скидка {discount.percent}%
           </span>
         )}
         <h3 className="font-display text-lg text-stone-800 leading-snug group-hover:text-sage-700 transition-colors">

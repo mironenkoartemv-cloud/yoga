@@ -112,7 +112,7 @@ const cancelBeforeStartByTrainer = async (trainingId) => {
   await notifyUsers(bookings.map((b) => b.userId), {
     type: 'TRAINER_NO_SHOW',
     title: 'Тренировка не началась',
-    body: 'Мы вернём оплату полностью и сохранили скидку 10% на любую новую запись.',
+    body: 'Тренер не смог начать занятие вовремя. Мы вернём оплату полностью и дали скидку 10% на любую следующую тренировку.',
   });
 
   return { training, bookingsCount: bookings.length };

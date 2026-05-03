@@ -45,9 +45,6 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      {discount && <DiscountBanner discount={discount} />}
-
       <div className="mb-6">
         <TrainingFilters />
       </div>
@@ -109,38 +106,6 @@ export default function CatalogPage() {
             </div>
           )}
         </>
-      )}
-    </div>
-  )
-}
-
-function DiscountBanner({ discount }) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  const expiresAt = new Date(discount.expiresAt).getTime()
-  const seconds = discount.expiresAt ? Math.max(0, Math.floor((expiresAt - now) / 1000)) : null
-  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
-  const ss = String(seconds % 60).padStart(2, '0')
-
-  if (seconds !== null && seconds <= 0) return null
-
-  return (
-    <div className="mb-5 rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-      <p className="font-body text-sm text-sage-800">
-        {discount.expiresAt
-          ? `Скидка ${discount.percent}% на любую новую запись`
-          : `У вас скидка ${discount.percent}% на любую новую запись`}
-      </p>
-      {seconds === null ? (
-        <p className="font-body text-sm font-semibold text-sage-700">Применится к следующей оплате</p>
-      ) : (
-        <p className="font-body text-sm font-semibold text-sage-700">
-          Осталось {mm}:{ss}
-        </p>
       )}
     </div>
   )
