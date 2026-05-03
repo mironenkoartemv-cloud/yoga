@@ -286,16 +286,24 @@ const markPaymentPaid = async (payment) => {
   ]);
 };
 
-const markPaymentRefunded = async (payment) => {
+const markPaymentRefunded = async (payment, amount = payment.amount) => {
+  const refundedAmount = Math.min(payment.amount, (payment.refundedAmount || 0) + amount);
+  const isPartial = refundedAmount > 0 && refundedAmount < payment.amount;
+
   await prisma.$transaction([
     prisma.payment.update({
       where: { id: payment.id },
-      data: { status: 'REFUNDED' },
+      data: {
+        status: isPartial ? 'PARTIAL_REFUNDED' : 'REFUNDED',
+        refundedAmount,
+      },
     }),
-    prisma.booking.update({
-      where: { id: payment.bookingId },
-      data: { status: 'CANCELLED' },
-    }),
+    ...(isPartial ? [] : [
+      prisma.booking.update({
+        where: { id: payment.bookingId },
+        data: { status: 'CANCELLED' },
+      }),
+    ]),
   ]);
 };
 
@@ -325,7 +333,7 @@ const syncPaymentStatus = async (paymentId) => {
   }
 
   if (['REFUNDED', 'PARTIAL_REFUNDED', 'REVERSED', 'PARTIAL_REVERSED'].includes(data.Status)) {
-    await markPaymentRefunded(payment);
+    await markPaymentRefunded(payment, payment.amount);
     return prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
   }
 
@@ -365,7 +373,7 @@ const handleWebhook = async (event) => {
   }
 
   if (['REFUNDED', 'PARTIAL_REFUNDED', 'REVERSED', 'PARTIAL_REVERSED'].includes(event.Status)) {
-    await markPaymentRefunded(payment);
+    await markPaymentRefunded(payment, payment.amount);
   }
 };
 
@@ -378,18 +386,23 @@ const stubConfirmPayment = async (paymentId) => {
   return { message: 'Платеж подтвержден (stub)' };
 };
 
-const refundPayment = async (paymentId) => {
+const refundPayment = async (paymentId, options = {}) => {
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  const amount = Math.min(options.amount || payment.amount, payment.amount - (payment.refundedAmount || 0));
+
+  if (amount <= 0) {
+    return { message: 'Возврат уже выполнен' };
+  }
 
   if (STUB_MODE || payment.provider !== 'tbank') {
-    await markPaymentRefunded(payment);
+    await markPaymentRefunded(payment, amount);
     return { message: 'Возврат выполнен (stub)' };
   }
 
   const payload = {
     TerminalKey: TBANK_TERMINAL_KEY,
     PaymentId: payment.externalId,
-    Amount: payment.amount,
+    Amount: amount,
   };
   payload.Token = makeToken(payload);
 
@@ -400,7 +413,7 @@ const refundPayment = async (paymentId) => {
 
   assertTbankSuccess(data, 'Не удалось выполнить возврат в Т-Банке');
 
-  await markPaymentRefunded(payment);
+  await markPaymentRefunded(payment, amount);
 
   return { message: 'Возврат выполнен' };
 };

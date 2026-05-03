@@ -23,11 +23,16 @@ export default function TrainingPage() {
   const [myPayment,    setMyPayment]    = useState(null)
   const [error,        setError]        = useState(null)
   const [payMsg,       setPayMsg]       = useState(null)
+  const [now,          setNow]          = useState(Date.now())
 
   useEffect(() => {
     loadTraining()
     if (isAuthenticated()) loadMyBooking()
   }, [id])
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadTraining = async () => {
     try {
@@ -65,6 +70,9 @@ export default function TrainingPage() {
       if (data.payment) {
         setMyPayment(data.payment)
         setBookingState('paying')
+        if (data.payment.confirmationUrl) {
+          window.location.href = data.payment.confirmationUrl
+        }
       } else {
         // Бесплатная тренировка
         setBookingState('done')
@@ -136,8 +144,12 @@ export default function TrainingPage() {
   const isPast      = startDate < new Date()
   const isOwner     = user?.id === training.trainerId || user?.id === training.trainer?.id
   const minutesUntil = Math.floor((startDate - Date.now()) / (1000 * 60))
-  const canStart    = minutesUntil <= 15
-  const canJoin     = bookingState === 'done' && (training.status === 'LIVE' || training.status === 'SCHEDULED')
+  const canOpenTrainerRoom = minutesUntil <= 10
+  const canOpenStudentRoom = minutesUntil <= 5 || training.status === 'LIVE'
+  const canCancelBooking = minutesUntil >= 30 && training.status === 'SCHEDULED'
+  const bookingExpiresAt = myBooking?.expiresAt ? new Date(myBooking.expiresAt) : null
+  const bookingExpiresInSec = bookingExpiresAt ? Math.max(0, Math.floor((bookingExpiresAt.getTime() - now) / 1000)) : null
+  const canJoin     = bookingState === 'done' && (training.status === 'LIVE' || training.status === 'SCHEDULED') && canOpenStudentRoom
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -247,11 +259,11 @@ export default function TrainingPage() {
           <div className="space-y-2">
             <p className="font-body text-sm text-stone-400 mb-3">Это ваша тренировка</p>
             {(training.status === 'SCHEDULED' || training.status === 'LIVE') && (
-              canStart ? (
+              canOpenTrainerRoom ? (
                 <Link to={`/room/${id}`} className={`btn-primary w-full justify-center ${
                   training.status === 'LIVE' ? 'bg-red-500 hover:bg-red-600' : ''
                 }`}>
-                  {training.status === 'LIVE' ? '🔴 Войти в комнату' : '▶ Начать тренировку'}
+                  {training.status === 'LIVE' ? '🔴 Войти в комнату' : 'Открыть комнату'}
                 </Link>
               ) : (
                 <div className="bg-sand-50 rounded-2xl p-4 text-center">
@@ -259,7 +271,7 @@ export default function TrainingPage() {
                     Тренировка начнётся {format(startDate, 'd MMMM в HH:mm', { locale: ru })}
                   </p>
                   <p className="font-body text-xs text-stone-400 mt-1">
-                    Кнопка «Начать» появится за 15 минут до старта
+                    Комната откроется за 10 минут до старта
                   </p>
                 </div>
               )
@@ -298,16 +310,18 @@ export default function TrainingPage() {
         ) : bookingState === 'paying' ? (
           <div className="space-y-3">
             <div className="bg-sand-50 rounded-2xl p-4 text-center">
-              <p className="font-body text-sm text-stone-600 mb-1">Оплата банковской картой</p>
+              <p className="font-body text-sm text-stone-600 mb-1">Место забронировано</p>
               <p className="font-body text-xs text-stone-400">
-                Оплата откроется на защищенной странице Т-Банка
+                {bookingExpiresAt
+                  ? `Оплатите до ${format(bookingExpiresAt, 'HH:mm')}. Осталось ${formatCountdown(bookingExpiresInSec)}`
+                  : 'Оплата откроется на защищенной странице Т-Банка'}
               </p>
             </div>
             <button onClick={handlePay} className="btn-primary w-full justify-center">
-              Оплатить {(training.price / 100).toLocaleString('ru-RU')} ₽
+              Перейти к оплате
             </button>
             <button onClick={handleCancel} className="btn-ghost w-full text-stone-400">
-              Отменить запись
+              Отменить бронь
             </button>
           </div>
 
@@ -322,13 +336,21 @@ export default function TrainingPage() {
                 <p className="font-body text-sm text-sage-700">
                   {training.status === 'FINISHED'
                     ? 'Тренировка завершена'
-                    : `Начнётся ${format(startDate, 'd MMMM в HH:mm', { locale: ru })}`}
+                    : canOpenStudentRoom
+                    ? `Ждём старта ${format(startDate, 'd MMMM в HH:mm', { locale: ru })}`
+                    : `Вход откроется за 5 минут до начала`}
                 </p>
               </div>
             )}
-            <button onClick={handleCancel} className="btn-ghost w-full text-stone-400 text-xs">
-              Отменить запись
-            </button>
+            {canCancelBooking ? (
+              <button onClick={handleCancel} className="btn-ghost w-full text-stone-400 text-xs">
+                Отменить запись
+              </button>
+            ) : (
+              <p className="font-body text-xs text-stone-400 text-center">
+                Отмена закрывается за 30 минут до старта
+              </p>
+            )}
           </div>
         ) : null}
 
@@ -348,6 +370,13 @@ export default function TrainingPage() {
       </div>
     </div>
   )
+}
+
+function formatCountdown(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined) return ''
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
 function InfoCard({ icon, label, value, highlight }) {

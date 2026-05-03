@@ -76,6 +76,12 @@ export default function CreateTrainingModal({ onClose }) {
               value={form.description} onChange={set('description')} />
           </Field>
 
+          <div className="rounded-2xl bg-sage-50 border border-sage-200 px-4 py-3">
+            <p className="font-body text-xs text-sage-800">
+              Платформа может дать ученику скидку 10% на следующее занятие после завершения или срыва тренировки. Скидка действует 60 минут и применяется за счёт платформы.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Направление">
               <select className="input-field" value={form.direction} onChange={set('direction')}>

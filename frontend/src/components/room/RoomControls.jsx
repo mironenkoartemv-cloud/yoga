@@ -6,6 +6,7 @@ export default function RoomControls({
   onToggleAudio,
   onToggleVideo,
   onLeave,
+  onEnd,
   participantCount,
   trainingTitle,
 }) {
@@ -48,6 +49,15 @@ export default function RoomControls({
         >
           <PhoneIcon />
         </button>
+        {onEnd && (
+          <button
+            onClick={onEnd}
+            className="h-12 px-4 rounded-2xl bg-sage-600 hover:bg-sage-700 text-white
+                       font-body text-sm transition-colors active:scale-95"
+          >
+            Завершить
+          </button>
+        )}
       </div>
 
       {/* Right — spacer */}

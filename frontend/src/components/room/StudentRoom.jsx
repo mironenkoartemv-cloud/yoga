@@ -14,6 +14,7 @@ export default function StudentRoom({
   trainingTitle,
   participantCount,
   mediaError,
+  banner,
 }) {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0c0a09', overflow: 'hidden' }}>
@@ -29,6 +30,7 @@ export default function StudentRoom({
 
       {/* Video area — занимает всё оставшееся пространство */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', padding: '12px' }}>
+        {banner}
 
         {/* Trainer video */}
         {trainerStream ? (

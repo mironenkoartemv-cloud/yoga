@@ -443,8 +443,8 @@ function PaymentsTab() {
 
   const totalRevenue = payments.filter(p => p.status === 'PAID').reduce((s, p) => s + p.amount, 0)
 
-  const STATUS_COLOR = { PENDING: 'bg-sand-100 text-sand-700', PAID: 'bg-sage-100 text-sage-700', REFUNDED: 'bg-stone-100 text-stone-500', FAILED: 'bg-red-100 text-red-500' }
-  const STATUS_LABEL = { PENDING: 'Ожидает', PAID: 'Оплачен', REFUNDED: 'Возврат', FAILED: 'Ошибка' }
+  const STATUS_COLOR = { PENDING: 'bg-sand-100 text-sand-700', PAID: 'bg-sage-100 text-sage-700', PARTIAL_REFUNDED: 'bg-amber-100 text-amber-700', REFUNDED: 'bg-stone-100 text-stone-500', FAILED: 'bg-red-100 text-red-500' }
+  const STATUS_LABEL = { PENDING: 'Ожидает', PAID: 'Оплачен', PARTIAL_REFUNDED: 'Частичный возврат', REFUNDED: 'Возврат', FAILED: 'Ошибка' }
 
   return (
     <div>

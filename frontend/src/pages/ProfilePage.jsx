@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../store/authStore'
-import { bookingsApi } from '../api/bookings'
+import { bookingsApi, paymentsApi } from '../api/bookings'
 import { historyApi, usersApi } from '../api/users'
 import { Input, Alert, Spinner } from '../components/ui'
 
@@ -17,6 +17,13 @@ export default function ProfilePage() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [tab, setTab] = useState('upcoming')
+  const [pendingBooking, setPendingBooking] = useState(null)
+
+  useEffect(() => {
+    usersApi.pendingBooking()
+      .then(({ data }) => setPendingBooking(data.booking))
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -40,6 +47,8 @@ export default function ProfilePage() {
       </div>
 
       {/* Tabs */}
+      {pendingBooking && <PendingPaymentBlock booking={pendingBooking} />}
+
       <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-6">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
@@ -54,6 +63,47 @@ export default function ProfilePage() {
       {tab === 'upcoming'  && <UpcomingTab />}
       {tab === 'history'   && <HistoryTab />}
       {tab === 'settings'  && <SettingsTab />}
+    </div>
+  )
+}
+
+function PendingPaymentBlock({ booking }) {
+  const [now, setNow] = useState(Date.now())
+  const [loading, setLoading] = useState(false)
+  const expiresAt = booking.expiresAt ? new Date(booking.expiresAt) : null
+  const seconds = expiresAt ? Math.max(0, Math.floor((expiresAt.getTime() - now) / 1000)) : null
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const pay = async () => {
+    const paymentId = booking.payment?.id || booking.payment?.paymentId
+    if (!paymentId) return
+    setLoading(true)
+    try {
+      const { data } = await paymentsApi.createLink(paymentId)
+      window.location.href = data.confirmationUrl
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="card p-4 mb-6 bg-sage-50 border-sage-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="font-body text-xs text-sage-700 uppercase tracking-wider mb-1">Ожидает оплаты</p>
+          <p className="font-body font-medium text-stone-800">{booking.training.title}</p>
+          <p className="font-body text-xs text-stone-500 mt-1">
+            {expiresAt ? `Место держим ещё ${formatCountdown(seconds)} · оплатить до ${format(expiresAt, 'HH:mm')}` : 'Место временно забронировано'}
+          </p>
+        </div>
+        <button onClick={pay} className="btn-primary justify-center" disabled={loading}>
+          {loading ? <Spinner size="sm" className="text-white" /> : 'Оплатить'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -252,6 +302,8 @@ function BookingCard({ booking, showJoin }) {
   const startDate = new Date(training.startAt)
   const isLive = training.status === 'LIVE'
   const isScheduled = training.status === 'SCHEDULED'
+  const minutesUntil = Math.floor((startDate - Date.now()) / (1000 * 60))
+  const canEnterRoom = isLive || (isScheduled && minutesUntil <= 5)
 
   return (
     <div className="card p-4 flex items-center gap-4">
@@ -283,11 +335,17 @@ function BookingCard({ booking, showJoin }) {
       </div>
 
       {/* Action */}
-      {showJoin && (isLive || isScheduled) && (
+      {showJoin && (isLive || isScheduled) && canEnterRoom && (
         <Link to={`/room/${training.id}`}
           className={`btn-primary py-2 text-xs shrink-0 ${isLive ? 'bg-red-500 hover:bg-red-600' : ''}`}>
           {isLive ? '🔴 Войти' : '▶ Войти'}
         </Link>
+      )}
+
+      {showJoin && isScheduled && !canEnterRoom && (
+        <button disabled className="btn-secondary py-2 text-xs shrink-0 opacity-50">
+          Вход за 5 мин
+        </button>
       )}
 
       {!showJoin && (
@@ -297,4 +355,11 @@ function BookingCard({ booking, showJoin }) {
       )}
     </div>
   )
+}
+
+function formatCountdown(totalSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined) return ''
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }

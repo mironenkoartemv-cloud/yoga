@@ -13,9 +13,11 @@ export default function TrainerRoom({
   onToggleAudio,
   onToggleVideo,
   onLeave,
+  onEnd,
   onMuteUser,
   trainingTitle,
   mediaError,
+  banner,
 }) {
   const [sidebarOpen,  setSidebarOpen]  = useState(true)
   const [pipExpanded,  setPipExpanded]  = useState(false)
@@ -55,6 +57,7 @@ export default function TrainerRoom({
 
         {/* Main area */}
         <div className="flex-1 relative p-3 overflow-hidden">
+          {banner}
 
           {/* Ученики — главный экран */}
           {studentIds.length > 0 ? (
@@ -159,6 +162,7 @@ export default function TrainerRoom({
         onToggleAudio={onToggleAudio}
         onToggleVideo={onToggleVideo}
         onLeave={onLeave}
+        onEnd={onEnd}
         participantCount={participantCount}
         trainingTitle={trainingTitle}
       />

@@ -13,14 +13,14 @@ const trainingValidation = [
   body('price').isInt({ min: 0 }).withMessage('Цена не может быть отрицательной'),
 ];
 
-// Публичные
-router.get('/', ctrl.listTrainings);
-router.get('/:id', ctrl.getTraining);
-
 // Тренер
 router.get('/trainer/mine', authenticate, requireRole('TRAINER', 'ADMIN'), ctrl.myTrainings);
 router.post('/', authenticate, requireRole('TRAINER', 'ADMIN'), trainingValidation, ctrl.createTraining);
 router.patch('/:id', authenticate, requireRole('TRAINER', 'ADMIN'), ctrl.updateTraining);
 router.delete('/:id', authenticate, requireRole('TRAINER', 'ADMIN'), ctrl.cancelTraining);
+
+// Публичные
+router.get('/', ctrl.listTrainings);
+router.get('/:id', ctrl.getTraining);
 
 module.exports = router;

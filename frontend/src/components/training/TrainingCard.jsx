@@ -9,7 +9,7 @@ const DIRECTION_COLOR = {
   PILATES: 'bg-sand-100 text-sand-700',
 }
 
-export default function TrainingCard({ training }) {
+export default function TrainingCard({ training, discount }) {
   const {
     id, title, trainer, direction, level,
     startAt, durationMin, maxSlots, bookedSlots, availableSlots, price, status,
@@ -17,6 +17,7 @@ export default function TrainingCard({ training }) {
 
   const isFull    = availableSlots <= 0
   const isFree    = price === 0
+  const discountedPrice = discount && !isFree ? Math.round(price * (100 - discount.percent) / 100) : null
   const startDate = new Date(startAt)
   const isToday   = new Date().toDateString() === startDate.toDateString()
   const isSoon    = startDate - Date.now() < 60 * 60 * 1000 // < 1 час
@@ -48,13 +49,23 @@ export default function TrainingCard({ training }) {
             </span>
           )}
         </div>
-        <span className="font-body font-semibold text-stone-800 text-sm shrink-0">
-          {isFree ? 'Бесплатно' : `${(price / 100).toLocaleString('ru-RU')} ₽`}
+        <span className="font-body font-semibold text-stone-800 text-sm shrink-0 text-right">
+          {isFree ? 'Бесплатно' : discountedPrice ? (
+            <>
+              <span className="block text-sage-700">{(discountedPrice / 100).toLocaleString('ru-RU')} ₽</span>
+              <span className="block text-[10px] text-stone-400 line-through">{(price / 100).toLocaleString('ru-RU')} ₽</span>
+            </>
+          ) : `${(price / 100).toLocaleString('ru-RU')} ₽`}
         </span>
       </div>
 
       {/* Title */}
       <div>
+        {discount && (
+          <span className="inline-flex mb-2 rounded-xl bg-sage-600 px-2.5 py-1 text-[11px] font-body font-semibold text-white">
+            -{discount.percent}% по вашей скидке
+          </span>
+        )}
         <h3 className="font-display text-lg text-stone-800 leading-snug group-hover:text-sage-700 transition-colors">
           {title}
         </h3>

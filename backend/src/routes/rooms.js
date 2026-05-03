@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../config/prisma');
 const { authenticate } = require('../middleware/auth');
+const { getJoinPolicy, getRoomWindow } = require('../services/roomPolicy');
 
 // GET /api/rooms/:trainingId — проверить доступ и получить состояние комнаты
 router.get('/:trainingId', authenticate, async (req, res, next) => {
@@ -14,14 +15,16 @@ router.get('/:trainingId', authenticate, async (req, res, next) => {
 
     const isTrainer = training.trainerId === req.user.id;
 
-    if (!isTrainer) {
-      const booking = await prisma.booking.findFirst({
-        where: { userId: req.user.id, trainingId, status: 'CONFIRMED' },
-      });
-      if (!booking) {
-        return res.status(403).json({ error: 'Нет подтверждённой записи на тренировку' });
-      }
-    }
+    const booking = !isTrainer
+      ? await prisma.booking.findFirst({
+          where: { userId: req.user.id, trainingId, status: 'CONFIRMED' },
+        })
+      : null;
+    const policy = getJoinPolicy({
+      training,
+      isTrainer,
+      hasConfirmedBooking: Boolean(booking),
+    });
 
     const room = await prisma.room.findUnique({
       where: { trainingId },
@@ -33,7 +36,15 @@ router.get('/:trainingId', authenticate, async (req, res, next) => {
       },
     });
 
-    res.json({ training, room, isTrainer });
+    res.json({
+      training,
+      room,
+      isTrainer,
+      canJoin: policy.canJoin,
+      reason: policy.reason,
+      openAt: policy.openAt,
+      window: getRoomWindow(training),
+    });
   } catch (err) { next(err); }
 });
 

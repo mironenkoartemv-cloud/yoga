@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const prisma = require('../config/prisma');
 const pushService = require('../services/pushService');
+const { expirePendingBookings } = require('../services/bookingExpiryService');
 
 /**
  * Планировщик уведомлений
@@ -14,6 +15,8 @@ const startScheduler = () => {
   // Каждую минуту
   cron.schedule('* * * * *', async () => {
     try {
+      await expirePendingBookings();
+
       await sendReminders(60, 'REMINDER_1H', 'Тренировка через 1 час', (t) =>
         `«${t.title}» начнётся в ${formatTime(t.startAt)}`
       );

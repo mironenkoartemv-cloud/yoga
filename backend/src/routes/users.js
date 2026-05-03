@@ -3,11 +3,50 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
+const { expirePendingBookings } = require('../services/bookingExpiryService');
 
 // GET /api/users/me — профиль текущего пользователя
 router.get('/me', authenticate, (req, res) => {
   const { password, ...user } = req.user;
   res.json(user);
+});
+
+router.get('/me/pending-booking', authenticate, async (req, res, next) => {
+  try {
+    await expirePendingBookings();
+    const booking = await prisma.booking.findFirst({
+      where: {
+        userId: req.user.id,
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        training: {
+          include: { trainer: { select: { id: true, name: true, avatarUrl: true } } },
+        },
+        payment: { select: { id: true, status: true, amount: true, provider: true, externalId: true } },
+      },
+      orderBy: { expiresAt: 'asc' },
+    });
+
+    res.json({ booking });
+  } catch (err) { next(err); }
+});
+
+// GET /api/users/me/discount — активная скидка пользователя
+router.get('/me/discount', authenticate, async (req, res, next) => {
+  try {
+    const discount = await prisma.userDiscount.findFirst({
+      where: {
+        userId: req.user.id,
+        usedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: { expiresAt: 'asc' },
+    });
+
+    res.json({ discount });
+  } catch (err) { next(err); }
 });
 
 // PATCH /api/users/me — обновить профиль

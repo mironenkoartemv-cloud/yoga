@@ -59,6 +59,10 @@ export default function NotificationsDropdown() {
     SCHEDULE_CHANGE:  '📅',
     TRAINER_APPROVED: '🎉',
     TRAINER_REJECTED: '❌',
+    BOOKING_PAYMENT_PENDING: '💳',
+    BOOKING_EXPIRED: '⌛',
+    TRAINER_NO_SHOW: '↩',
+    TRAINER_DISCONNECT: '↩',
   }
 
   if (!isAuthenticated()) return null

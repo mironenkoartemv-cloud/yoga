@@ -1,9 +1,12 @@
 const prisma = require('../config/prisma');
 const { validationResult } = require('express-validator');
+const { expirePendingBookings } = require('../services/bookingExpiryService');
 
 // GET /api/trainings — каталог с фильтрами
 const listTrainings = async (req, res, next) => {
   try {
+    await expirePendingBookings();
+
     const { direction, level, trainerId, from, to, page = 1, limit = 20 } = req.query;
 
     const where = {
@@ -26,7 +29,7 @@ const listTrainings = async (req, res, next) => {
         where,
         include: {
           trainer: { select: { id: true, name: true, avatarUrl: true } },
-          _count: { select: { bookings: { where: { status: 'CONFIRMED' } } } },
+          _count: { select: { bookings: { where: { status: { in: ['CONFIRMED', 'PENDING'] } } } } },
         },
         orderBy: { startAt: 'asc' },
         skip,
@@ -48,11 +51,13 @@ const listTrainings = async (req, res, next) => {
 // GET /api/trainings/:id
 const getTraining = async (req, res, next) => {
   try {
+    await expirePendingBookings();
+
     const training = await prisma.training.findUniqueOrThrow({
       where: { id: req.params.id },
       include: {
         trainer: { select: { id: true, name: true, avatarUrl: true } },
-        _count: { select: { bookings: { where: { status: 'CONFIRMED' } } } },
+        _count: { select: { bookings: { where: { status: { in: ['CONFIRMED', 'PENDING'] } } } } },
       },
     });
 

@@ -40,6 +40,7 @@ enum BookingStatus {
 enum PaymentStatus {
   PENDING
   PAID
+  PARTIAL_REFUNDED
   REFUNDED
   FAILED
 }
@@ -67,6 +68,7 @@ model User {
   trainingsAsTrainer Training[] @relation("TrainerTrainings")
   notifications   Notification[]
   roomParticipants RoomParticipant[]
+  discounts       UserDiscount[]
 
   @@map("users")
 }
@@ -101,6 +103,7 @@ model Booking {
   trainingId  String
   training    Training      @relation(fields: [trainingId], references: [id])
   status      BookingStatus @default(PENDING)
+  expiresAt   DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -117,6 +120,7 @@ model Payment {
   bookingId   String        @unique
   booking     Booking       @relation(fields: [bookingId], references: [id])
   amount      Int           // в копейках
+  refundedAmount Int        @default(0)
   status      PaymentStatus @default(PENDING)
   provider    String        @default("stub") // yukassa, sbp, stub
   externalId  String?       // ID во внешней системе
@@ -124,6 +128,21 @@ model Payment {
   updatedAt   DateTime      @updatedAt
 
   @@map("payments")
+}
+
+model UserDiscount {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  percent          Int
+  reason           String
+  sourceTrainingId String?
+  expiresAt        DateTime?
+  usedAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, expiresAt, usedAt])
+  @@map("user_discounts")
 }
 
 model Room {

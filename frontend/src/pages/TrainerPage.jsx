@@ -126,7 +126,7 @@ function TrainingRow({ training, onRefresh }) {
   const startDate     = new Date(training.startAt)
   const hoursUntil    = differenceInHours(startDate, new Date())
   const minutesUntil  = differenceInMinutes(startDate, new Date())
-  const canStart      = minutesUntil <= 15 && minutesUntil >= -training.durationMin
+  const canOpenRoom   = minutesUntil <= 10 && minutesUntil >= -training.durationMin
   const canEdit       = hoursUntil > 24
   const bookedSlots   = training._count?.bookings || 0
   const isUpcoming    = training.status === 'SCHEDULED' || training.status === 'LIVE'
@@ -231,10 +231,10 @@ function TrainingRow({ training, onRefresh }) {
         {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {isUpcoming && (
-            canStart ? (
+            canOpenRoom ? (
               <Link to={`/room/${training.id}`}
                 className={`btn-primary py-1.5 text-xs ${training.status === 'LIVE' ? 'bg-red-500 hover:bg-red-600' : ''}`}>
-                {training.status === 'LIVE' ? '🔴 Войти' : '▶ Начать'}
+                {training.status === 'LIVE' ? '🔴 Войти' : 'Открыть'}
               </Link>
             ) : (
               <div className="text-center">
