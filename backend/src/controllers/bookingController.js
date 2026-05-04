@@ -149,6 +149,9 @@ const cancelBooking = async (req, res, next) => {
     if (booking.status === 'CANCELLED') {
       return res.status(400).json({ error: 'Запись уже отменена' });
     }
+    if (booking.status === 'CONFIRMED' && booking.training.status !== 'SCHEDULED') {
+      return res.status(400).json({ error: 'Отменить можно только запланированную тренировку' });
+    }
     if (booking.status === 'CONFIRMED' && booking.userId === req.user.id && req.user.role !== 'ADMIN' && !canCancelWithRefund(booking.training)) {
       return res.status(400).json({ error: 'Отменить запись можно не позднее чем за 30 минут до начала занятия' });
     }

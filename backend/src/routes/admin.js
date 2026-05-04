@@ -326,19 +326,23 @@ router.get('/trainer-requests', async (req, res, next) => {
 
     let users;
     if (status === 'pending') {
-      users = await prisma.$queryRaw`
-        SELECT id, name, email, phone, "avatarUrl", "trainerBio", "createdAt", role::text
-        FROM users
-        WHERE "trainerRequest" = true AND role = 'STUDENT'
-        ORDER BY "createdAt" DESC
-      `;
+      users = await prisma.user.findMany({
+        where: { trainerRequest: true, role: 'STUDENT' },
+        select: {
+          id: true, name: true, email: true, phone: true,
+          avatarUrl: true, trainerBio: true, createdAt: true, role: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     } else {
-      users = await prisma.$queryRaw`
-        SELECT id, name, email, phone, "avatarUrl", "trainerBio", "createdAt", role::text
-        FROM users
-        WHERE "trainerRequest" = true AND role = 'TRAINER'
-        ORDER BY "createdAt" DESC
-      `;
+      users = await prisma.user.findMany({
+        where: { trainerRequest: true, role: 'TRAINER' },
+        select: {
+          id: true, name: true, email: true, phone: true,
+          avatarUrl: true, trainerBio: true, createdAt: true, role: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     }
 
     res.json(users);
@@ -348,9 +352,10 @@ router.get('/trainer-requests', async (req, res, next) => {
 // PATCH /api/admin/trainer-requests/:id/approve — одобрить
 router.patch('/trainer-requests/:id/approve', async (req, res, next) => {
   try {
-    await prisma.$queryRawUnsafe(
-      'UPDATE users SET role = \'TRAINER\' WHERE id = \'' + req.params.id + '\''
-    );
+    await prisma.user.update({
+      where: { id: req.params.id },
+      data: { role: 'TRAINER', trainerRequest: true },
+    });
 
     await prisma.notification.create({
       data: {
@@ -370,9 +375,10 @@ router.patch('/trainer-requests/:id/reject', async (req, res, next) => {
   try {
     const { reason } = req.body;
 
-    await prisma.$queryRawUnsafe(
-      'UPDATE users SET "trainerRequest" = false WHERE id = \'' + req.params.id + '\''
-    );
+    await prisma.user.update({
+      where: { id: req.params.id },
+      data: { trainerRequest: false },
+    });
 
     await prisma.notification.create({
       data: {

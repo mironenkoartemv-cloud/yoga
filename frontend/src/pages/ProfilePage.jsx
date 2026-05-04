@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import { bookingsApi, paymentsApi } from '../api/bookings'
 import { historyApi, usersApi } from '../api/users'
 import { Input, Alert, Spinner } from '../components/ui'
+import { BOOKING_STATUS, getBookingFlowStatus } from '../utils/bookingStatus'
 
 const TABS = ['upcoming', 'history', 'settings']
 const TAB_LABELS = { upcoming: 'Предстоящие', history: 'История', settings: 'Настройки' }
@@ -45,6 +46,15 @@ export default function ProfilePage() {
           <p className="font-body text-sm text-stone-400">{user?.email || user?.phone}</p>
         </div>
       </div>
+
+      {user?.trainerRequest && user?.role === 'STUDENT' && (
+        <div className="card p-4 mb-6 bg-sage-50 border-sage-200">
+          <p className="font-body text-xs text-sage-700 uppercase tracking-wider mb-1">Заявка тренера</p>
+          <p className="font-body text-sm text-stone-600">
+            Кабинет уже создан. После модерации здесь появится уведомление, а в шапке откроется создание тренировок.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       {pendingBooking && <PendingPaymentBlock booking={pendingBooking} />}
@@ -115,11 +125,10 @@ function UpcomingTab() {
 
   useEffect(() => {
     bookingsApi.my().then(({ data }) => {
-      const upcoming = data.filter((b) =>
-        b.status === 'CONFIRMED' &&
-        b.training.status !== 'FINISHED' &&
-        b.training.status !== 'CANCELLED'
-      )
+      const upcoming = data.filter((b) => {
+        const status = getBookingFlowStatus(b)
+        return [BOOKING_STATUS.BOOKED, BOOKING_STATUS.CAN_JOIN, BOOKING_STATUS.LIVE].includes(status)
+      })
       setBookings(upcoming)
     }).finally(() => setLoading(false))
   }, [])
@@ -302,8 +311,15 @@ function BookingCard({ booking, showJoin }) {
   const startDate = new Date(training.startAt)
   const isLive = training.status === 'LIVE'
   const isScheduled = training.status === 'SCHEDULED'
-  const minutesUntil = Math.floor((startDate - Date.now()) / (1000 * 60))
-  const canEnterRoom = isLive || (isScheduled && minutesUntil <= 5)
+  const flowStatus = getBookingFlowStatus(booking)
+  const canEnterRoom = flowStatus === BOOKING_STATUS.LIVE || flowStatus === BOOKING_STATUS.CAN_JOIN
+  const statusText = {
+    [BOOKING_STATUS.BOOKED]: 'Записан',
+    [BOOKING_STATUS.CAN_JOIN]: 'Можно войти',
+    [BOOKING_STATUS.LIVE]: 'Идёт сейчас',
+    [BOOKING_STATUS.FINISHED]: 'Завершено',
+    [BOOKING_STATUS.CANCELLED]: 'Отменено',
+  }[flowStatus]
 
   return (
     <div className="card p-4 flex items-center gap-4">
@@ -321,7 +337,18 @@ function BookingCard({ booking, showJoin }) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="font-body font-medium text-stone-700 truncate">{training.title}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="font-body font-medium text-stone-700 truncate">{training.title}</p>
+          {statusText && (
+            <span className={`badge shrink-0 ${
+              flowStatus === BOOKING_STATUS.LIVE || flowStatus === BOOKING_STATUS.CAN_JOIN
+                ? 'bg-sage-100 text-sage-700'
+                : 'bg-stone-100 text-stone-500'
+            }`}>
+              {statusText}
+            </span>
+          )}
+        </div>
         <p className="font-body text-xs text-stone-400 mt-0.5 flex items-center gap-2">
           <span>{format(startDate, 'HH:mm')}</span>
           <span>·</span>
@@ -342,7 +369,7 @@ function BookingCard({ booking, showJoin }) {
         </Link>
       )}
 
-      {showJoin && isScheduled && !canEnterRoom && (
+      {showJoin && flowStatus === BOOKING_STATUS.BOOKED && (
         <button disabled className="btn-secondary py-2 text-xs shrink-0 opacity-50">
           Вход за 5 мин
         </button>

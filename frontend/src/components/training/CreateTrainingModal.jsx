@@ -100,7 +100,7 @@ export default function CreateTrainingModal({ onClose }) {
 
           <Field label="Дата и время">
             <input className="input-field" type="datetime-local"
-              value={form.startAt} onChange={set('startAt')} required />
+              value={form.startAt} onChange={set('startAt')} min={minDateTime()} required />
           </Field>
 
           <div className="grid grid-cols-3 gap-3">
@@ -140,7 +140,13 @@ function Field({ label, children }) {
 }
 
 function defaultDateTime() {
-  const d = new Date(Date.now() + 60 * 60 * 1000) // +1 час
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000) // +24 часа
   d.setMinutes(0, 0, 0)
   return d.toISOString().slice(0, 16)
+}
+
+function minDateTime() {
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  const offset = d.getTimezoneOffset() * 60 * 1000
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
 }

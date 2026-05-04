@@ -2,6 +2,17 @@ const prisma = require('../config/prisma');
 const { validationResult } = require('express-validator');
 const { expirePendingBookings } = require('../services/bookingExpiryService');
 
+const MIN_TRAINING_LEAD_HOURS = 24;
+const MODERATED_TRAINING_FIELDS = ['title', 'description', 'direction', 'level'];
+const DIRECT_TRAINING_FIELDS = ['startAt', 'durationMin', 'maxSlots', 'price'];
+
+const hoursUntil = (date, now = new Date()) => (new Date(date) - now.getTime()) / (1000 * 60 * 60);
+const normalizeDirectValue = (key, value) => {
+  if (key === 'startAt') return new Date(value);
+  if (['durationMin', 'maxSlots', 'price'].includes(key)) return Number(value);
+  return value;
+};
+
 // GET /api/trainings — каталог с фильтрами
 const listTrainings = async (req, res, next) => {
   try {
@@ -9,15 +20,17 @@ const listTrainings = async (req, res, next) => {
 
     const { direction, level, trainerId, from, to, page = 1, limit = 20 } = req.query;
 
+    const now = new Date();
     const where = {
-      status: { not: 'CANCELLED' },
+      status: 'SCHEDULED',
+      startAt: { gte: now },
     };
     if (direction) where.direction = direction;
     if (level) where.level = level;
     if (trainerId) where.trainerId = trainerId;
     if (from || to) {
-      where.startAt = {};
-      if (from) where.startAt.gte = new Date(from);
+      const fromDate = from ? new Date(from) : now;
+      where.startAt = { gte: fromDate > now ? fromDate : now };
       if (to) where.startAt.lte = new Date(to);
     }
 
@@ -77,6 +90,11 @@ const createTraining = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { title, description, direction, level, startAt, durationMin, maxSlots, price } = req.body;
+    const newStartAt = new Date(startAt);
+
+    if (req.user.role !== 'ADMIN' && hoursUntil(newStartAt) < MIN_TRAINING_LEAD_HOURS) {
+      return res.status(400).json({ error: 'Создать тренировку можно не менее чем за 24 часа до старта' });
+    }
 
     const training = await prisma.training.create({
       data: {
@@ -85,7 +103,7 @@ const createTraining = async (req, res, next) => {
         trainerId: req.user.id,
         direction,
         level,
-        startAt: new Date(startAt),
+        startAt: newStartAt,
         durationMin: Number(durationMin),
         maxSlots: Number(maxSlots),
         price: Number(price),
@@ -129,30 +147,37 @@ const updateTraining = async (req, res, next) => {
         }
       }
     } else {
-      // Тренер может менять только время
-      if (req.body.startAt !== undefined) {
-        const newStartAt = new Date(req.body.startAt);
-        const hoursUntilNewStart = (newStartAt - Date.now()) / (1000 * 60 * 60);
-        if (hoursUntilNewStart < 12) {
-          return res.status(400).json({ error: 'Новое время тренировки должно быть не менее чем через 12 часов' });
+      for (const key of DIRECT_TRAINING_FIELDS) {
+        if (req.body[key] !== undefined) {
+          data[key] = normalizeDirectValue(key, req.body[key]);
         }
-        data.startAt = newStartAt;
       }
-      // Описание — заявка на модерацию
-      if (req.body.description !== undefined) {
-        await prisma.moderationRequest.create({
-          data: {
+
+      if (data.startAt && hoursUntil(data.startAt) < MIN_TRAINING_LEAD_HOURS) {
+        return res.status(400).json({ error: 'Новое время тренировки должно быть не менее чем через 24 часа' });
+      }
+
+      const moderatedChanges = MODERATED_TRAINING_FIELDS
+        .filter((key) => req.body[key] !== undefined && req.body[key] !== training[key]);
+
+      if (moderatedChanges.length) {
+        await prisma.moderationRequest.createMany({
+          data: moderatedChanges.map((field) => ({
             trainingId: req.params.id,
-            trainerId:  req.user.id,
-            field:      'description',
-            newValue:   req.body.description,
-          },
+            trainerId: req.user.id,
+            field,
+            newValue: String(req.body[field] ?? ''),
+          })),
         });
-        return res.status(202).json({
-          message: 'Заявка на изменение описания отправлена на модерацию',
-          pending: true,
-        });
+
+        if (Object.keys(data).length === 0) {
+          return res.status(202).json({
+            message: 'Заявка на изменение тренировки отправлена на модерацию',
+            pending: true,
+          });
+        }
       }
+
     }
 
     if (Object.keys(data).length === 0) {

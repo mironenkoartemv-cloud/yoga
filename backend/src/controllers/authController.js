@@ -32,15 +32,10 @@ const registerByEmail = async (req, res, next) => {
         password: hashed,
         name,
         role: 'STUDENT',
+        trainerRequest: isTrainerRequest,
+        trainerBio: isTrainerRequest ? trainerBio || null : null,
       },
     });
-
-    if (isTrainerRequest) {
-      await prisma.$queryRawUnsafe(
-        'UPDATE users SET "trainerRequest" = true, "trainerBio" = $1 WHERE id = \'' + user.id + '\'',
-        trainerBio || null
-      );
-    }
 
     const token = generateToken(user.id);
     res.status(201).json({
@@ -128,15 +123,10 @@ const verifyPhoneOtp = async (req, res, next) => {
           name: name || 'Пользователь',
           password: hashed,
           role: 'STUDENT', // TRAINER-запрос обрабатывается ниже
+          trainerRequest: isTrainerRequest,
+          trainerBio: isTrainerRequest ? trainerBio || null : null,
         },
       });
-
-      if (isTrainerRequest) {
-        await prisma.$queryRawUnsafe(
-          'UPDATE users SET "trainerRequest" = true, "trainerBio" = $1 WHERE id = \'' + user.id + '\'',
-          trainerBio || null
-        );
-      }
     }
 
     const token = generateToken(user.id);

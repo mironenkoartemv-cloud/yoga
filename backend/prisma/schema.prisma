@@ -60,6 +60,8 @@ model User {
   avatarUrl   String?
   role        Role      @default(STUDENT)
   isBlocked   Boolean   @default(false)
+  trainerRequest Boolean @default(false)
+  trainerBio     String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

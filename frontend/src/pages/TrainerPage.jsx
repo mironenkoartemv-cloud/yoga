@@ -149,11 +149,11 @@ function TrainingRow({ training, onRefresh }) {
     setLoading(true)
     setError(null)
 
-    // Клиентская валидация — новое время минимум через 12 часов
+    // Клиентская валидация — новое время минимум через 24 часа
     const newDate = new Date(newTime)
     const hoursUntilNew = (newDate - Date.now()) / (1000 * 60 * 60)
-    if (hoursUntilNew < 12) {
-      setError('Новое время должно быть не менее чем через 12 часов от сейчас')
+    if (hoursUntilNew < 24) {
+      setError('Новое время должно быть не менее чем через 24 часа от сейчас')
       setLoading(false)
       return
     }
@@ -281,7 +281,7 @@ function TrainingRow({ training, onRefresh }) {
             <input type="datetime-local" value={newTime}
               onChange={e => setNewTime(e.target.value)}
               min={(() => {
-                const d = new Date(Date.now() + 12 * 60 * 60 * 1000)
+                const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
                 const offset = d.getTimezoneOffset() * 60 * 1000
                 return new Date(d.getTime() - offset).toISOString().slice(0, 16)
               })()}

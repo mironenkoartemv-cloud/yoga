@@ -86,7 +86,7 @@ export default function RegisterPage() {
             Ваша заявка на роль тренера отправлена на модерацию.
           </p>
           <p className="font-body text-sm text-stone-400 mb-6">
-            Мы рассмотрим её в течение 24 часов и уведомим вас по SMS.
+            Мы рассмотрим её в течение 24 часов и пришлём уведомление в личный кабинет.
           </p>
           <Link to="/catalog" className="btn-primary inline-flex">
             Перейти в каталог

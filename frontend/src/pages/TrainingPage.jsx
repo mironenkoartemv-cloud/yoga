@@ -6,6 +6,7 @@ import { trainingsApi } from '../api/trainings'
 import { bookingsApi, paymentsApi } from '../api/bookings'
 import { useAuthStore } from '../store/authStore'
 import { Spinner, Alert } from '../components/ui'
+import { BOOKING_STATUS, canCancelConfirmedBooking, getBookingFlowStatus } from '../utils/bookingStatus'
 
 const DIRECTION_LABEL = { YOGA: 'Йога', PILATES: 'Пилатес' }
 const LEVEL_LABEL = { BEGINNER: 'Начинающий', INTERMEDIATE: 'Средний', ADVANCED: 'Продвинутый' }
@@ -146,10 +147,11 @@ export default function TrainingPage() {
   const minutesUntil = Math.floor((startDate - Date.now()) / (1000 * 60))
   const canOpenTrainerRoom = minutesUntil <= 10
   const canOpenStudentRoom = minutesUntil <= 5 || training.status === 'LIVE'
-  const canCancelBooking = minutesUntil >= 30 && training.status === 'SCHEDULED'
   const bookingExpiresAt = myBooking?.expiresAt ? new Date(myBooking.expiresAt) : null
   const bookingExpiresInSec = bookingExpiresAt ? Math.max(0, Math.floor((bookingExpiresAt.getTime() - now) / 1000)) : null
-  const canJoin     = bookingState === 'done' && (training.status === 'LIVE' || training.status === 'SCHEDULED') && canOpenStudentRoom
+  const bookingFlowStatus = getBookingFlowStatus(myBooking ? { ...myBooking, training } : null, new Date(now))
+  const canJoin = bookingFlowStatus === BOOKING_STATUS.LIVE || bookingFlowStatus === BOOKING_STATUS.CAN_JOIN
+  const canCancelConfirmed = canCancelConfirmedBooking(myBooking ? { ...myBooking, training } : null, new Date(now))
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -342,7 +344,7 @@ export default function TrainingPage() {
                 </p>
               </div>
             )}
-            {canCancelBooking ? (
+            {canCancelConfirmed ? (
               <button onClick={handleCancel} className="btn-ghost w-full text-stone-400 text-xs">
                 Отменить запись
               </button>

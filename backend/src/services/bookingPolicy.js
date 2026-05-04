@@ -11,6 +11,7 @@ const isPendingBookingActive = (booking, now = new Date()) => {
 };
 
 const canCancelWithRefund = (training, now = new Date()) => {
+  if (!training || training.status !== 'SCHEDULED') return false;
   const minutesUntilStart = (new Date(training.startAt) - now.getTime()) / (1000 * 60);
   return minutesUntilStart >= CANCEL_WITH_REFUND_BEFORE_MIN;
 };
