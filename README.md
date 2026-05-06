@@ -66,6 +66,8 @@ npm run dev              # http://localhost:3000
 | Тренер | trainer2@yoga.app | password123 |
 | Ученик | student1@yoga.app | password123 |
 | Ученик | student2@yoga.app | password123 |
+| Ученик | student3@yoga.app | password123 |
+| Ученик | student4@yoga.app | password123 |
 
 ---
 

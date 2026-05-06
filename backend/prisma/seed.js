@@ -67,6 +67,26 @@ async function main() {
     },
   });
 
+  const student3 = await prisma.user.create({
+    data: {
+      email: 'student3@yoga.app',
+      password: passwordHash,
+      name: 'Елена Морозова',
+      role: 'STUDENT',
+      avatarUrl: 'https://i.pravatar.cc/150?img=45',
+    },
+  });
+
+  const student4 = await prisma.user.create({
+    data: {
+      email: 'student4@yoga.app',
+      password: passwordHash,
+      name: 'Алексей Волков',
+      role: 'STUDENT',
+      avatarUrl: 'https://i.pravatar.cc/150?img=56',
+    },
+  });
+
   console.log('✅ Users created');
 
   // ── Тренировки ──
@@ -190,6 +210,44 @@ async function main() {
     },
   });
 
+  const booking3 = await prisma.booking.create({
+    data: {
+      userId: student3.id,
+      trainingId: allTrainings[0].id,
+      status: 'CONFIRMED',
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      userId: student3.id,
+      bookingId: booking3.id,
+      amount: allTrainings[0].price,
+      status: 'PAID',
+      provider: 'stub',
+      externalId: 'stub_seed_003',
+    },
+  });
+
+  const booking4 = await prisma.booking.create({
+    data: {
+      userId: student4.id,
+      trainingId: allTrainings[0].id,
+      status: 'CONFIRMED',
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      userId: student4.id,
+      bookingId: booking4.id,
+      amount: allTrainings[0].price,
+      status: 'PAID',
+      provider: 'stub',
+      externalId: 'stub_seed_004',
+    },
+  });
+
   // Бесплатная запись
   await prisma.booking.create({
     data: {
@@ -208,6 +266,8 @@ async function main() {
   console.log(`  trainer: trainer2@yoga.app`);
   console.log(`  student: student1@yoga.app`);
   console.log(`  student: student2@yoga.app`);
+  console.log(`  student: student3@yoga.app`);
+  console.log(`  student: student4@yoga.app`);
 }
 
 main()
