@@ -10,6 +10,7 @@ import RegisterPage from './pages/auth/RegisterPage'
 import CatalogPage  from './pages/CatalogPage'
 import TrainingPage from './pages/TrainingPage'
 import RoomPage     from './pages/RoomPage'
+import LiveKitRoomPage from './pages/LiveKitRoomPage'
 import ProfilePage  from './pages/ProfilePage'
 import TrainerPage  from './pages/TrainerPage'
 import AdminPage    from './pages/AdminPage'
@@ -45,6 +46,7 @@ export default function App() {
 
       {/* Комната — без шапки, на весь экран */}
       <Route path="/room/:id" element={<ProtectedRoute><RoomPage /></ProtectedRoute>} />
+      <Route path="/room-livekit/:id" element={<ProtectedRoute><LiveKitRoomPage /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
