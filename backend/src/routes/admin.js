@@ -282,6 +282,51 @@ router.get('/trainings', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/admin/trainings — создать тренировку для выбранного тренера без временных ограничений
+router.post('/trainings', [
+  body('title').trim().notEmpty().withMessage('Название обязательно'),
+  body('trainerId').isUUID().withMessage('Выберите тренера'),
+  body('direction').isIn(['YOGA', 'PILATES']).withMessage('Направление: YOGA или PILATES'),
+  body('level').isIn(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
+  body('startAt').isISO8601().withMessage('Неверный формат даты'),
+  body('durationMin').isInt({ min: 15 }).withMessage('Длительность минимум 15 минут'),
+  body('maxSlots').isInt({ min: 1 }).withMessage('Минимум 1 место'),
+  body('price').isInt({ min: 0 }).withMessage('Цена не может быть отрицательной'),
+], async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { title, description, trainerId, direction, level, startAt, durationMin, maxSlots, price } = req.body;
+
+    const trainer = await prisma.user.findFirst({
+      where: { id: trainerId, role: 'TRAINER', isBlocked: false },
+      select: { id: true },
+    });
+    if (!trainer) return res.status(400).json({ error: 'Тренер не найден или заблокирован' });
+
+    const training = await prisma.training.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        trainerId,
+        direction,
+        level,
+        startAt: new Date(startAt),
+        durationMin: Number(durationMin),
+        maxSlots: Number(maxSlots),
+        price: Number(price),
+      },
+      include: {
+        trainer: { select: { id: true, name: true } },
+        _count: { select: { bookings: { where: { status: 'CONFIRMED' } } } },
+      },
+    });
+
+    res.status(201).json(training);
+  } catch (err) { next(err); }
+});
+
 // ─────────────────────────────────────
 // ПЛАТЕЖИ
 // ─────────────────────────────────────

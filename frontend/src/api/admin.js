@@ -14,6 +14,7 @@ export const adminApi = {
 
   // Trainings
   trainings:      (params)     => api.get('/admin/trainings', { params }),
+  createTraining: (data)       => api.post('/admin/trainings', data),
   updateTraining: (id, data)   => api.patch(`/trainings/${id}`, data),
   cancelTraining: (id)         => api.delete(`/trainings/${id}`),
 

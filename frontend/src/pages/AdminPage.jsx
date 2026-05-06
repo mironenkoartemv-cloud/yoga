@@ -296,12 +296,26 @@ function TrainersTab() {
 // ── Trainings ─────────────────────────────────────────
 function TrainingsTab() {
   const [trainings, setTrainings] = useState([])
+  const [trainers,  setTrainers]  = useState([])
   const [total,     setTotal]     = useState(0)
   const [loading,   setLoading]   = useState(true)
+  const [creating,  setCreating]  = useState(false)
+  const [showForm,  setShowForm]  = useState(false)
   const [status,    setStatus]    = useState('')
   const [direction, setDirection] = useState('')
   const [page,      setPage]      = useState(1)
   const [error,     setError]     = useState(null)
+  const [form,      setForm]      = useState({
+    title: 'Тест LiveKit',
+    trainerId: '',
+    direction: 'YOGA',
+    level: 'BEGINNER',
+    startAt: adminDefaultDateTime(),
+    durationMin: 60,
+    maxSlots: 10,
+    price: 0,
+    description: '',
+  })
 
   const load = () => {
     setLoading(true)
@@ -314,6 +328,41 @@ function TrainingsTab() {
   }
 
   useEffect(() => { load() }, [page, status, direction])
+
+  useEffect(() => {
+    adminApi.trainers()
+      .then(({ data }) => {
+        const activeTrainers = data.filter(t => !t.isBlocked)
+        setTrainers(activeTrainers)
+        setForm(f => f.trainerId || !activeTrainers[0] ? f : { ...f, trainerId: activeTrainers[0].id })
+      })
+      .catch(() => setTrainers([]))
+  }, [])
+
+  const setCreateField = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }))
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setCreating(true)
+    try {
+      await adminApi.createTraining({
+        ...form,
+        durationMin: Number(form.durationMin),
+        maxSlots: Number(form.maxSlots),
+        price: Math.round(Number(form.price) * 100),
+      })
+      setForm(f => ({ ...f, title: 'Тест LiveKit', startAt: adminDefaultDateTime() }))
+      setShowForm(false)
+      setStatus('')
+      setPage(1)
+      load()
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Ошибка создания')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const handleCancel = async (id, title) => {
     if (!confirm(`Отменить тренировку "${title}"?`)) return
@@ -337,7 +386,10 @@ function TrainingsTab() {
     <div>
       {error && <Alert type="error" className="mb-4">{error}</Alert>}
 
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        <button onClick={() => setShowForm(v => !v)} className="btn-primary py-2 text-xs">
+          {showForm ? 'Скрыть форму' : 'Создать тренировку'}
+        </button>
         <select value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}
           className="input-field text-sm py-2 w-40">
           <option value="">Все статусы</option>
@@ -353,6 +405,43 @@ function TrainingsTab() {
           <option value="PILATES">Пилатес</option>
         </select>
       </div>
+
+      {showForm && (
+        <div className="card p-4 mb-4">
+          <h3 className="font-display text-lg text-stone-700 mb-4">Новая тренировка от админа</h3>
+          <form onSubmit={handleCreate} className="grid md:grid-cols-4 gap-3">
+            <input value={form.title} onChange={setCreateField('title')}
+              placeholder="Название" className="input-field text-sm py-2 md:col-span-2" required />
+            <select value={form.trainerId} onChange={setCreateField('trainerId')}
+              className="input-field text-sm py-2 md:col-span-2" required>
+              <option value="" disabled>Выберите тренера</option>
+              {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <input type="datetime-local" value={form.startAt} onChange={setCreateField('startAt')}
+              className="input-field text-sm py-2 md:col-span-2" required />
+            <textarea value={form.description} onChange={setCreateField('description')}
+              placeholder="Описание" className="input-field text-sm py-2 resize-none md:col-span-2" rows={1} />
+            <select value={form.direction} onChange={setCreateField('direction')} className="input-field text-sm py-2">
+              <option value="YOGA">Йога</option>
+              <option value="PILATES">Пилатес</option>
+            </select>
+            <select value={form.level} onChange={setCreateField('level')} className="input-field text-sm py-2">
+              <option value="BEGINNER">Начинающий</option>
+              <option value="INTERMEDIATE">Средний</option>
+              <option value="ADVANCED">Продвинутый</option>
+            </select>
+            <input type="number" min="15" max="180" value={form.durationMin} onChange={setCreateField('durationMin')}
+              className="input-field text-sm py-2" placeholder="Минут" required />
+            <input type="number" min="1" max="50" value={form.maxSlots} onChange={setCreateField('maxSlots')}
+              className="input-field text-sm py-2" placeholder="Мест" required />
+            <input type="number" min="0" value={form.price} onChange={setCreateField('price')}
+              className="input-field text-sm py-2 md:col-span-3" placeholder="Цена, ₽" required />
+            <button type="submit" className="btn-primary py-2 text-xs justify-center" disabled={creating || !form.trainerId}>
+              {creating ? <Spinner size="sm" className="text-white" /> : 'Создать'}
+            </button>
+          </form>
+        </div>
+      )}
 
       <p className="font-body text-xs text-stone-400 mb-3">{total} тренировок</p>
 
@@ -982,6 +1071,12 @@ function formatCompactDate(value) {
   return new Date(value)
     .toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
     .replace(/\./g, '')
+}
+
+function adminDefaultDateTime() {
+  const d = new Date(Date.now() + 2 * 60 * 1000)
+  const offset = d.getTimezoneOffset() * 60 * 1000
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
 }
 
 function StatCard({ label, value, color }) {
