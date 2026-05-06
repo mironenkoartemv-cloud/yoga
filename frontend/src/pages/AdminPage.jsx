@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { adminApi } from '../api/admin'
+import { dateTimeLocalToIso, toDateTimeLocalValue } from '../utils/dateTime'
 import { Spinner, Alert } from '../components/ui'
 
 const TABS = ['dashboard', 'legal', 'users', 'trainers', 'trainings', 'payments', 'moderation']
@@ -348,6 +349,7 @@ function TrainingsTab() {
     try {
       await adminApi.createTraining({
         ...form,
+        startAt: dateTimeLocalToIso(form.startAt),
         durationMin: Number(form.durationMin),
         maxSlots: Number(form.maxSlots),
         price: Math.round(Number(form.price) * 100),
@@ -1075,8 +1077,7 @@ function formatCompactDate(value) {
 
 function adminDefaultDateTime() {
   const d = new Date(Date.now() + 2 * 60 * 1000)
-  const offset = d.getTimezoneOffset() * 60 * 1000
-  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
+  return toDateTimeLocalValue(d)
 }
 
 function StatCard({ label, value, color }) {

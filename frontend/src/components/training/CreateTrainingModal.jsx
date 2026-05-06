@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trainingsApi } from '../../api/trainings'
+import { dateTimeLocalToIso, toDateTimeLocalValue } from '../../utils/dateTime'
 import { Spinner } from '../ui'
 
 export default function CreateTrainingModal({ onClose }) {
@@ -27,6 +28,7 @@ export default function CreateTrainingModal({ onClose }) {
     try {
       const { data } = await trainingsApi.create({
         ...form,
+        startAt:     dateTimeLocalToIso(form.startAt),
         durationMin: Number(form.durationMin),
         maxSlots:    Number(form.maxSlots),
         price:       Math.round(Number(form.price) * 100), // рубли → копейки
@@ -142,11 +144,10 @@ function Field({ label, children }) {
 function defaultDateTime() {
   const d = new Date(Date.now() + 24 * 60 * 60 * 1000) // +24 часа
   d.setMinutes(0, 0, 0)
-  return d.toISOString().slice(0, 16)
+  return toDateTimeLocalValue(d)
 }
 
 function minDateTime() {
   const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  const offset = d.getTimezoneOffset() * 60 * 1000
-  return new Date(d.getTime() - offset).toISOString().slice(0, 16)
+  return toDateTimeLocalValue(d)
 }

@@ -5,6 +5,7 @@ import { ru } from 'date-fns/locale'
 import { useAuthStore } from '../store/authStore'
 import { trainingsApi } from '../api/trainings'
 import { bookingsApi, paymentsApi } from '../api/bookings'
+import { dateTimeLocalToIso, toDateTimeLocalValue } from '../utils/dateTime'
 import api from '../api/client'
 import { Spinner, Alert } from '../components/ui'
 
@@ -139,6 +140,14 @@ function TrainingRow({ training, onRefresh }) {
     } catch {}
   }
 
+  const handleEditToggle = () => {
+    setEditing(v => {
+      const next = !v
+      if (next) setNewTime(toDateTimeLocalValue(training.startAt))
+      return next
+    })
+  }
+
   const handleExpand = () => {
     setExpanded(v => !v)
     if (!expanded) loadParticipants()
@@ -159,7 +168,7 @@ function TrainingRow({ training, onRefresh }) {
     }
 
     try {
-      await trainingsApi.update(training.id, { startAt: newTime })
+      await trainingsApi.update(training.id, { startAt: dateTimeLocalToIso(newTime) })
       setEditing(false)
       onRefresh()
     } catch (err) {
@@ -247,7 +256,7 @@ function TrainingRow({ training, onRefresh }) {
           )}
           {isUpcoming && canEdit && (
             <>
-              <button onClick={() => setEditing(v => !v)}
+              <button onClick={handleEditToggle}
                 className="btn-ghost py-1.5 text-xs text-stone-400">
                 ✏️ Время
               </button>
@@ -282,8 +291,7 @@ function TrainingRow({ training, onRefresh }) {
               onChange={e => setNewTime(e.target.value)}
               min={(() => {
                 const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
-                const offset = d.getTimezoneOffset() * 60 * 1000
-                return new Date(d.getTime() - offset).toISOString().slice(0, 16)
+                return toDateTimeLocalValue(d)
               })()}
               className="input-field text-sm py-2 flex-1" required />
             <button type="submit" className="btn-primary py-2 text-xs" disabled={loading}>
