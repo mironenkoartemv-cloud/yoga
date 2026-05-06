@@ -42,6 +42,29 @@ const getTrainingAccess = async (trainingId, user) => {
   return { training, isTrainer, policy };
 };
 
+const ensureLiveKitStarted = async (training, isTrainer) => {
+  if (!isTrainer || training.status !== 'SCHEDULED') return training;
+
+  const now = new Date();
+  const { startAt, scheduledEndAt } = getRoomWindow(training, now);
+  if (now < startAt || now > scheduledEndAt) return training;
+
+  const [, updatedTraining] = await prisma.$transaction([
+    prisma.room.upsert({
+      where: { trainingId: training.id },
+      create: { trainingId: training.id, status: 'LIVE', startedAt: now },
+      update: { status: 'LIVE', startedAt: now },
+    }),
+    prisma.training.update({
+      where: { id: training.id },
+      data: { status: 'LIVE' },
+      include: { trainer: { select: { id: true, name: true, avatarUrl: true } } },
+    }),
+  ]);
+
+  return updatedTraining;
+};
+
 // GET /api/rooms/:trainingId — проверить доступ и получить состояние комнаты
 router.get('/:trainingId', authenticate, async (req, res, next) => {
   try {
@@ -75,8 +98,9 @@ router.get('/:trainingId', authenticate, async (req, res, next) => {
 router.post('/:trainingId/livekit-token', authenticate, async (req, res, next) => {
   try {
     const { trainingId } = req.params;
-    const { training, isTrainer, policy } = await getTrainingAccess(trainingId, req.user);
+    let { training, isTrainer, policy } = await getTrainingAccess(trainingId, req.user);
     if (!policy.canJoin) return res.status(403).json({ error: policy.reason });
+    training = await ensureLiveKitStarted(training, isTrainer);
 
     const { AccessToken } = await import('livekit-server-sdk');
     const { livekitUrl, apiKey, apiSecret } = getLiveKitConfig();
