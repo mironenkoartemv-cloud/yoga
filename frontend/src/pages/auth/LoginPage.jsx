@@ -4,13 +4,11 @@ import { useAuthStore } from '../../store/authStore'
 import AuthLayout from '../../components/auth/AuthLayout'
 import { Input, Alert, Spinner } from '../../components/ui'
 
-const showEmailLogin = import.meta.env.DEV
-
 export default function LoginPage() {
   const navigate = useNavigate()
   const { sendOtp, verifyOtp, loginByPhone, loginByEmail, loading, error, clearError } = useAuthStore()
 
-  const [mode, setMode] = useState('password') // 'password' | 'email' | 'sms'
+  const [mode, setMode] = useState('email') // 'email' | 'password' | 'sms'
   const [step, setStep] = useState(1) // для SMS: 1 = телефон, 2 = код
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -80,7 +78,6 @@ export default function LoginPage() {
 
   // Переключение режима сбрасывает всё
   const switchMode = (newMode) => {
-    if (newMode === 'email' && !showEmailLogin) return
     setMode(newMode)
     setStep(1)
     setCode('')
@@ -145,27 +142,25 @@ export default function LoginPage() {
       {/* Переключатель режима */}
       <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-5">
         <button type="button"
+          onClick={() => switchMode('email')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+            mode === 'email' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          }`}>
+          @ Email
+        </button>
+        <button type="button"
           onClick={() => switchMode('password')}
           className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
             mode === 'password' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
           }`}>
-          🔒 Телефон
+          Телефон
         </button>
-        {showEmailLogin && (
-          <button type="button"
-            onClick={() => switchMode('email')}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
-              mode === 'email' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
-            }`}>
-            @ Email
-          </button>
-        )}
         <button type="button"
           onClick={() => switchMode('sms')}
           className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
             mode === 'sms' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
           }`}>
-          💬 По SMS
+          SMS
         </button>
       </div>
 

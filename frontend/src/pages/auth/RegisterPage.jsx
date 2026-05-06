@@ -6,12 +6,14 @@ import { Input, Alert, Spinner } from '../../components/ui'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const { sendOtp, verifyOtp, loading, error, clearError } = useAuthStore()
+  const { registerByEmail, sendOtp, verifyOtp, loading, error, clearError } = useAuthStore()
 
   const [step, setStep] = useState(1) // 1 = ввод данных, 2 = ввод кода
+  const [method, setMethod] = useState('email') // 'email' | 'phone'
   const [roleType, setRoleType] = useState('student')
   const [form, setForm] = useState({
     name: '',
+    email: '',
     phone: '',
     password: '',
     confirm: '',
@@ -34,16 +36,55 @@ export default function RegisterPage() {
     clearError()
   }
 
+  const switchMethod = (nextMethod) => {
+    setMethod(nextMethod)
+    setStep(1)
+    setCode('')
+    setFieldErrors({})
+    clearError()
+  }
+
+  const validateEmail = () => {
+    if (!form.email.trim()) return 'Введите email'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return 'Неверный email'
+    return null
+  }
+
   const validateStep1 = () => {
     const errs = {}
     if (!form.name.trim())  errs.name  = 'Введите имя'
-    if (!form.phone.trim()) errs.phone = 'Введите номер телефона'
-    else if (!/^\+7\d{10}$/.test(form.phone.replace(/\s/g, '')))
-      errs.phone = 'Формат: +79001234567'
+    if (method === 'email') {
+      const emailErr = validateEmail()
+      if (emailErr) errs.email = emailErr
+    } else {
+      if (!form.phone.trim()) errs.phone = 'Введите номер телефона'
+      else if (!/^\+7\d{10}$/.test(form.phone.replace(/\s/g, '')))
+        errs.phone = 'Формат: +79001234567'
+    }
     if (form.password.length < 6) errs.password = 'Минимум 6 символов'
     if (form.password !== form.confirm) errs.confirm = 'Пароли не совпадают'
     if (!form.personalDataConsent) errs.personalDataConsent = 'Нужно согласие на обработку данных'
     return errs
+  }
+
+  const handleRegisterByEmail = async (e) => {
+    e.preventDefault()
+    const errs = validateStep1()
+    if (Object.keys(errs).length) return setFieldErrors(errs)
+    try {
+      const result = await registerByEmail(
+        form.email,
+        form.password,
+        form.name,
+        roleType === 'trainer' ? 'TRAINER' : 'STUDENT',
+        roleType === 'trainer' ? form.trainerBio : undefined
+      )
+      if (result?.trainerRequestPending) {
+        setTrainerPending(true)
+      } else {
+        navigate('/catalog')
+      }
+    } catch {}
   }
 
   const handleSendOtp = async (e) => {
@@ -150,7 +191,24 @@ export default function RegisterPage() {
     >
       {error && <Alert type="error" className="mb-4">{error}</Alert>}
 
-      {/* Роль */}
+      {/* Способ регистрации */}
+      <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-4">
+        <button type="button"
+          onClick={() => switchMethod('email')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+            method === 'email' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          }`}>
+          Email
+        </button>
+        <button type="button"
+          onClick={() => switchMethod('phone')}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-body font-medium transition-all duration-150 ${
+            method === 'phone' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'
+          }`}>
+          Телефон
+        </button>
+      </div>
+
       <div className="flex gap-1 p-1 bg-sand-100 rounded-2xl mb-5">
         <button type="button"
           onClick={() => setRoleType('student')}
@@ -176,7 +234,7 @@ export default function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
+      <form onSubmit={method === 'email' ? handleRegisterByEmail : handleSendOtp} className="flex flex-col gap-4">
         <Input
           label="Имя"
           type="text"
@@ -186,14 +244,25 @@ export default function RegisterPage() {
           error={fieldErrors.name}
           autoFocus
         />
-        <Input
-          label="Телефон"
-          type="tel"
-          placeholder="+79001234567"
-          value={form.phone}
-          onChange={set('phone')}
-          error={fieldErrors.phone}
-        />
+        {method === 'email' ? (
+          <Input
+            label="Email"
+            type="email"
+            placeholder="student@yoga.app"
+            value={form.email}
+            onChange={set('email')}
+            error={fieldErrors.email}
+          />
+        ) : (
+          <Input
+            label="Телефон"
+            type="tel"
+            placeholder="+79001234567"
+            value={form.phone}
+            onChange={set('phone')}
+            error={fieldErrors.phone}
+          />
+        )}
         <Input
           label="Пароль"
           type="password"
@@ -245,7 +314,7 @@ export default function RegisterPage() {
         </label>
 
         <button type="submit" className="btn-primary w-full mt-1" disabled={loading}>
-          {loading ? <Spinner size="sm" className="text-white" /> : 'Получить код'}
+          {loading ? <Spinner size="sm" className="text-white" /> : method === 'email' ? 'Зарегистрироваться' : 'Получить код'}
         </button>
       </form>
     </AuthLayout>
