@@ -245,7 +245,11 @@ function TrackElement({ track, muted = false, audioOnly = false, className = '' 
     if (!audioOnly) {
       el.className = className
     } else {
-      el.style.display = 'none'
+      el.style.position = 'absolute'
+      el.style.width = '1px'
+      el.style.height = '1px'
+      el.style.opacity = '0'
+      el.style.pointerEvents = 'none'
     }
 
     containerRef.current.replaceChildren(el)
@@ -256,7 +260,7 @@ function TrackElement({ track, muted = false, audioOnly = false, className = '' 
     }
   }, [audioOnly, className, muted, track])
 
-  return <div ref={containerRef} className={audioOnly ? 'hidden' : 'w-full h-full'} />
+  return <div ref={containerRef} className={audioOnly ? 'absolute w-px h-px overflow-hidden' : 'w-full h-full'} />
 }
 
 function StatusDot({ label }) {
