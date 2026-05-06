@@ -241,7 +241,7 @@ function TrainingRow({ training, onRefresh }) {
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {isUpcoming && (
             canOpenRoom ? (
-              <Link to={`/room/${training.id}`}
+              <Link to={`/room-livekit/${training.id}`}
                 className={`btn-primary py-1.5 text-xs ${training.status === 'LIVE' ? 'bg-red-500 hover:bg-red-600' : ''}`}>
                 {training.status === 'LIVE' ? '🔴 Войти' : 'Открыть'}
               </Link>

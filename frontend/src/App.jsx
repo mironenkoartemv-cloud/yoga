@@ -9,7 +9,6 @@ import LoginPage    from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import CatalogPage  from './pages/CatalogPage'
 import TrainingPage from './pages/TrainingPage'
-import RoomPage     from './pages/RoomPage'
 import LiveKitRoomPage from './pages/LiveKitRoomPage'
 import ProfilePage  from './pages/ProfilePage'
 import TrainerPage  from './pages/TrainerPage'
@@ -45,10 +44,14 @@ export default function App() {
       </Route>
 
       {/* Комната — без шапки, на весь экран */}
-      <Route path="/room/:id" element={<ProtectedRoute><RoomPage /></ProtectedRoute>} />
+      <Route path="/room/:id" element={<NavigateToLiveKitRoom />} />
       <Route path="/room-livekit/:id" element={<ProtectedRoute><LiveKitRoomPage /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
+}
+
+function NavigateToLiveKitRoom() {
+  return <Navigate to={window.location.pathname.replace('/room/', '/room-livekit/')} replace />
 }

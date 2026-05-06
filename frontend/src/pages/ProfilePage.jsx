@@ -363,7 +363,7 @@ function BookingCard({ booking, showJoin }) {
 
       {/* Action */}
       {showJoin && (isLive || isScheduled) && canEnterRoom && (
-        <Link to={`/room/${training.id}`}
+        <Link to={`/room-livekit/${training.id}`}
           className={`btn-primary py-2 text-xs shrink-0 ${isLive ? 'bg-red-500 hover:bg-red-600' : ''}`}>
           {isLive ? '🔴 Войти' : '▶ Войти'}
         </Link>

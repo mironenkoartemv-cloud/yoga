@@ -262,7 +262,7 @@ export default function TrainingPage() {
             <p className="font-body text-sm text-stone-400 mb-3">Это ваша тренировка</p>
             {(training.status === 'SCHEDULED' || training.status === 'LIVE') && (
               canOpenTrainerRoom ? (
-                <Link to={`/room/${id}`} className={`btn-primary w-full justify-center ${
+                <Link to={`/room-livekit/${id}`} className={`btn-primary w-full justify-center ${
                   training.status === 'LIVE' ? 'bg-red-500 hover:bg-red-600' : ''
                 }`}>
                   {training.status === 'LIVE' ? '🔴 Войти в комнату' : 'Открыть комнату'}
@@ -330,7 +330,7 @@ export default function TrainingPage() {
         ) : bookingState === 'done' ? (
           <div className="space-y-3">
             {canJoin ? (
-              <Link to={`/room/${id}`} className="btn-primary w-full justify-center">
+              <Link to={`/room-livekit/${id}`} className="btn-primary w-full justify-center">
                 {training.status === 'LIVE' ? '🔴 Войти — идёт сейчас' : '▶ Войти в тренировку'}
               </Link>
             ) : (
